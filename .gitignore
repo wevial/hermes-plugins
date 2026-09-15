@@ -1,0 +1,8 @@
+node_modules/
+test/theme-studio/shims/
+test/theme-studio/results.json
+test/theme-studio/swatch-preview.png
+test/theme-studio/swatch-palettes.json
+test/theme-studio/swatch.html
+FINDINGS.md
+.DS_Store

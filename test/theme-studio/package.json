@@ -1,0 +1,15 @@
+{
+  "name": "hermes-plugins-tests",
+  "private": true,
+  "description": "Browser tests for Hermes desktop plugins (theme-studio). Uses real Chromium via playwright-core against react/react-dom 19 (matching the desktop app).",
+  "type": "module",
+  "scripts": {
+    "test": "node build-shims.mjs && node theme-studio.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "playwright-core": "^1.62.1",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  }
+}

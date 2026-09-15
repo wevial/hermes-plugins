@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>theme-studio test</title>
+<script type="importmap">
+{
+  "imports": {
+    "@hermes/plugin-sdk": "/sdk-stub.mjs",
+    "react": "/shims/react.esm.js",
+    "react/jsx-runtime": "/shims/jsx-runtime.esm.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="root"></div>
+<script type="module">
+  // Warm the import graph so module-load failures surface as page errors
+  // before the test driver evaluates anything.
+  try { await import('/plugin.js') }
+  catch (e) { console.error('warmup: ' + e.message) }
+  finally { window.__warmupDone = true }
+</script>
+</body>
+</html>

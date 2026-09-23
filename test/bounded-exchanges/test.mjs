@@ -53,14 +53,17 @@ const fixture = JSON.parse(
     encoding: 'utf8'
   })
 )
-await check('fixture comes from the real read model and is labeled read-only', () => {
-  assert.equal(fixture.all.ok, true)
-  assert.equal(fixture.all.data.kind, 'bounded-events.exchanges')
+await check('fixture comes from the real multi-profile service on disposable roots', () => {
+  assert.deepEqual(fixture.profiles.data.profiles.map(p => p.id), ['alpha', 'beta', 'gamma'])
+  assert.equal(fixture.all.data.kind, 'bounded-events.exchange-service')
   assert.equal(fixture.all.data.read_only, true)
-  assert.equal(fixture.all.data.exchanges.length, 2)
-  assert.ok(fixture.all.data.page.next_cursor)
-  assert.equal(fixture.error.ok, false)
-  assert.equal(fixture.error.error.reason, 'recipient_mismatch')
+  assert.equal(fixture.all.data.complete, false) // gamma's root does not exist
+  assert.equal(fixture.all.data.exchanges.length, 4)
+  assert.ok(fixture.alpha.data.page.next_cursor)
+  assert.equal(fixture.gamma.ok, false)
+  assert.equal(fixture.gamma.error.reason, 'root_unavailable')
+  assert.deepEqual(fixture.all_nope.data.exchanges, [])
+  assert.equal(fixture.all_nope.data.complete, false)
 })
 
 // ------------------------------------------------------------ loader contract (Node)
@@ -157,12 +160,32 @@ const mount = (kind, fx) =>
       el.innerHTML = ''
       globalThis.__queries = []
       let source
-      if (kind === 'registered') {
+      if (kind.startsWith('registered')) {
         const contributions = []
         const ctx = {
           source: 'plugin:' + mod.default.id,
           register: c => (contributions.push(c), () => {}),
           registerMany: cs => (contributions.push(...cs), () => {})
+        }
+        globalThis.__restPaths = []
+        if (kind === 'registered-rest') {
+          // Stands in for the host's ctx.rest: answers with exact ExchangeService responses
+          // (the same bodies the real host mount returned in viewer_host_mount.py).
+          ctx.rest = async path => {
+            globalThis.__restPaths.push(path)
+            if (path === '/profiles') return fx.profiles
+            const [route, search] = path.split('?')
+            if (route !== '/exchanges') throw new Error('404 Not Found')
+            const q = Object.fromEntries(new URLSearchParams(search || ''))
+            if (q.viewer_profile === 'all') return q.conversation_id ? fx.all_nope : fx.all
+            if (q.viewer_profile === 'alpha') return q.cursor ? fx.alpha_page2 : fx.alpha
+            return fx[q.viewer_profile]
+          }
+        } else if (kind === 'registered-404') {
+          ctx.rest = async path => {
+            globalThis.__restPaths.push(path)
+            throw new Error('404 Plugin not found')
+          }
         }
         mod.default.register(ctx)
         globalThis.__contributions = contributions
@@ -171,33 +194,41 @@ const mount = (kind, fx) =>
         globalThis.__root.render(pane.render())
         return
       }
+      // Every fixture answer is an exact ExchangeService response (see gen-fixture.py).
+      const pick = q => {
+        if (q.viewer_profile === 'all') {
+          return q.conversation_id === 'conv-1' ? fx.all_conv1 : q.conversation_id ? fx.all_nope : fx.all
+        }
+        if (q.viewer_profile === 'alpha') {
+          return q.cursor ? fx.alpha_page2 : q.conversation_id ? fx.alpha_none : fx.alpha
+        }
+        return fx[q.viewer_profile]
+      }
+      const unwrap = reply => {
+        if (!reply.ok) {
+          const e = new Error(reply.error.message)
+          e.reason = reply.error.reason
+          throw e
+        }
+        return reply.data
+      }
+      // Each load waits until the test releases it by index, so races can be ordered.
+      globalThis.__pending = []
+      const held = () => new Promise(resolve => globalThis.__pending.push(resolve))
+      const fixtureSource = answer => ({
+        kind: 'fixture',
+        label: 'Isolated fixture',
+        listProfiles: async () => fx.profiles.data,
+        load: async query => {
+          globalThis.__queries.push(query)
+          await held()
+          return unwrap(answer(query))
+        }
+      })
       if (kind === 'fixture') {
-        let release
-        globalThis.__gate = new Promise(r => (release = r))
-        globalThis.__release = release
-        source = {
-          kind: 'fixture',
-          label: 'Isolated fixture',
-          load: async query => {
-            globalThis.__queries.push(query)
-            await globalThis.__gate
-            if (query.cursor) return fx.page2.data
-            if (query.conversation_id === 'conv-1') return fx.conv1.data
-            if (query.conversation_id) return fx.none.data
-            return fx.all.data
-          }
-        }
-      } else if (kind === 'error') {
-        source = {
-          kind: 'fixture',
-          label: 'Isolated fixture',
-          load: async query => {
-            globalThis.__queries.push(query)
-            const e = new Error(fx.error.error.message)
-            e.reason = fx.error.error.reason
-            throw e
-          }
-        }
+        source = fixtureSource(pick)
+      } else if (kind === 'wrong-answer') {
+        source = fixtureSource(() => fx.beta) // always answers beta, whatever was asked
       }
       globalThis.__root = t.ReactDOMClient.createRoot(el)
       globalThis.__root.render(t.React.createElement(mod.ExchangePane, { source }))
@@ -206,6 +237,11 @@ const mount = (kind, fx) =>
   )
 const text = () => page.locator('#mount').innerText()
 const queries = () => page.evaluate(() => globalThis.__queries)
+const release = i => page.evaluate(i => globalThis.__pending[i](), i)
+const waitPending = n => page.waitForFunction(n => globalThis.__pending.length >= n, n)
+const rows = () => page.locator('[data-slot="exchange"]')
+const rowProfiles = () => page.$$eval('[data-slot="exchange"]', els => els.map(e => e.dataset.profile))
+const pick = name => page.getByRole('button', { name, exact: true })
 
 await check('registers one pane and one palette command; disabled pane reads nothing', async () => {
   await mount('registered')
@@ -218,8 +254,9 @@ await check('registers one pane and one palette command; disabled pane reads not
   await page.locator('[data-stub="error-state"]').waitFor()
   const body = await text()
   assert.match(body, /Not connected/)
-  assert.match(body, /cannot yet prove which profile/)
+  assert.match(body, /offers plugins no backend REST access/)
   assert.doesNotMatch(body, /ISOLATED FIXTURE/)
+  assert.equal(await page.locator('[data-slot="exchange-profiles"]').count(), 0)
   assert.equal(await page.locator('[data-slot="exchange"]').count(), 0)
   assert.equal(await page.locator('input[disabled]').count(), 2)
   // Palette run opens the same (disconnected) view; it never sends or activates anything.
@@ -232,22 +269,58 @@ await check('registers one pane and one palette command; disabled pane reads not
   assert.deepEqual(calls, [['openWorkspace', 'bounded-exchanges']])
 })
 
-await check('loading, then fixture exchanges rendered with honest state labels', async () => {
+await check('registered pane uses ctx.rest: exact namespace paths, service data, labels', async () => {
+  await mount('registered-rest', fixture)
+  await rows().first().waitFor()
+  const paths = await page.evaluate(() => globalThis.__restPaths)
+  assert.deepEqual(paths, ['/profiles', '/exchanges?viewer_profile=all&limit=20'])
+  assert.equal(await rows().count(), 4)
+  const body = await text()
+  assert.doesNotMatch(body, /ISOLATED FIXTURE|Not connected/)
+  assert.match(body, /Incomplete: 1 profile\(s\) unavailable/)
+  await pick('Alpha bot').click()
+  await page.waitForFunction(() => globalThis.__restPaths.length === 3)
+  assert.equal((await page.evaluate(() => globalThis.__restPaths)).at(-1), '/exchanges?viewer_profile=alpha&limit=20')
+  await page.locator('[data-profile="alpha"]').first().waitFor()
+  await pick('Older').click()
+  await page.waitForFunction(() => globalThis.__restPaths.length === 4)
+  const older = (await page.evaluate(() => globalThis.__restPaths)).at(-1)
+  assert.equal(older, '/exchanges?viewer_profile=alpha&limit=20&cursor=' + encodeURIComponent(fixture.alpha.data.page.next_cursor))
+  assert(!/root|hermes_home|path=/.test((await page.evaluate(() => globalThis.__restPaths)).join(' ')))
+})
+
+await check('registered pane: host route missing/disabled shows "not reachable", never empty', async () => {
+  await mount('registered-404', fixture)
+  await page.locator('[data-stub="error-state"]').waitFor()
+  const body = await text()
+  assert.match(body, /viewer service is not reachable on this backend/)
+  assert.equal(await rows().count(), 0)
+  assert.equal(await page.locator('[data-stub="empty-state"]').count(), 0)
+})
+
+await check('overview: every row labeled by profile, duplicate IDs kept apart, incomplete shown', async () => {
   await mount('fixture', fixture)
   await page.locator('[data-slot="exchange-loading"]').waitFor()
-  await page.evaluate(() => globalThis.__release())
-  await page.locator('[data-slot="exchange"]').first().waitFor()
-  assert.equal(await page.locator('[data-slot="exchange"]').count(), 2)
+  await waitPending(1)
+  assert.deepEqual(await queries(), [{ viewer_profile: 'all', conversation_id: '', chat_session_id: '', cursor: null, limit: 20 }])
+  assert.equal(await pick('All profiles').getAttribute('aria-pressed'), 'true')
+  await release(0)
+  await rows().first().waitFor()
+  assert.equal(await rows().count(), 4)
+  assert.deepEqual((await rowProfiles()).sort(), ['alpha', 'alpha', 'alpha', 'beta'])
+  const m1 = await page.$$eval('[data-exchange-id="agent-x/m1/v1"]', els => els.map(e => e.dataset.profile).sort())
+  assert.deepEqual(m1, ['alpha', 'beta'])
   const body = await text()
   assert.match(body, /ISOLATED FIXTURE: synthetic data, not a live backend/)
-  assert.match(body, /Handed to Hermes job output/)
+  assert.match(body, /Alpha bot/)
+  assert.match(body, /Beta bot/)
+  assert.match(body, /Incomplete: 1 profile\(s\) unavailable/)
+  assert.match(body, /Gamma bot: root_unavailable/)
   assert.match(body, /Chat delivery unknown/)
-  assert.match(body, /unauthenticated source/)
-  assert.match(body, /sub-1 g1: active/)
-  assert.match(body, /No reply yet \(one reply allowed\)/)
+  assert.match(body, /Reply published/)
+  assert.match(body, /Reader receipt unknown/)
   assert.match(body, /is not a receipt/)
   assert.doesNotMatch(body, /\breceived\b|\bdelivered\b|\bread by\b/i)
-  assert.deepEqual(await queries(), [{ conversation_id: '', chat_session_id: '', cursor: null, limit: 20 }])
 })
 
 await check('untrusted message text renders inert and visible', async () => {
@@ -257,50 +330,86 @@ await check('untrusted message text renders inert and visible', async () => {
   assert.equal(await page.evaluate(() => globalThis.__pwned), undefined)
   assert(!body.includes('‮'), 'bidi override must not reach the DOM text')
   assert.match(body, /\\u\{202e\}evil\\u\{202c\}/)
-})
-
-await check('Older pages with next_cursor; reply shown as published, receipt unknown', async () => {
-  await page.getByRole('button', { name: 'Older' }).click()
-  await page.locator('[data-exchange-id="agent-x/m1/v1"]').waitFor()
-  const q = await queries()
-  assert.equal(q.at(-1).cursor, fixture.all.data.page.next_cursor)
-  const body = await text()
-  assert.match(body, /Reply published/)
-  assert.match(body, /Reader receipt unknown/)
-  // No Tailwind stylesheet in this harness, so assert the DOM text + class, not layout.
-  const replyText = page.locator('[data-exchange-id="agent-x/m1/v1"] [data-slot="exchange-text"]').last()
+  const replyText = page.locator('[data-exchange-id="agent-x/m1/v1"][data-profile="alpha"] [data-slot="exchange-text"]').last()
   assert.equal(await replyText.textContent(), 'Build is green.\nTwo flaky tests.')
-  assert.match(await replyText.getAttribute('class'), /whitespace-pre-wrap/)
-  await page.getByRole('button', { name: 'Newest' }).waitFor()
 })
 
-await check('conversation filter: invalid input refused inline, valid input queries, empty state', async () => {
+await check('switching clears rows at once and a late answer for an old selection is dropped', async () => {
+  await pick('Beta bot').click()
+  await page.locator('[data-slot="exchange-loading"]').waitFor()
+  assert.equal(await rows().count(), 0) // no overview rows left under the beta selection
+  await waitPending(2)
+  await pick('Alpha bot').click()
+  await waitPending(3)
+  await release(1) // beta answers late, after the user moved on
+  await page.waitForTimeout(100)
+  assert.equal(await rows().count(), 0)
+  await page.locator('[data-slot="exchange-loading"]').waitFor()
+  await release(2)
+  await rows().first().waitFor()
+  assert.deepEqual(await rowProfiles(), ['alpha', 'alpha'])
+  const q = await queries()
+  assert.deepEqual(q.slice(1).map(x => x.viewer_profile), ['beta', 'alpha'])
+})
+
+await check('cursor stays with its profile: Older pages alpha, switching resets it', async () => {
+  await pick('Older').click()
+  await waitPending(4)
+  assert.equal((await queries()).at(-1).cursor, fixture.alpha.data.page.next_cursor)
+  await release(3)
+  await page.locator('[data-exchange-id="agent-x/m1/v1"][data-profile="alpha"]').waitFor()
+  assert.deepEqual(await rowProfiles(), ['alpha'])
+  await pick('All profiles').click()
+  await waitPending(5)
+  const last = (await queries()).at(-1)
+  assert.deepEqual([last.viewer_profile, last.cursor], ['all', null])
+  await release(4)
+  await rows().first().waitFor()
+})
+
+await check('filters: invalid refused inline; empty overview with an unavailable profile is not a false empty', async () => {
   const before = (await queries()).length
   await page.getByLabel('Conversation ID').fill('bad id!')
-  await page.getByRole('button', { name: 'Filter' }).click()
+  await pick('Filter').click()
   await page.getByRole('alert').waitFor()
   assert.equal((await queries()).length, before)
-  await page.getByLabel('Conversation ID').fill('conv-1')
-  await page.getByRole('button', { name: 'Filter' }).click()
-  await page.waitForFunction(() => globalThis.__queries.at(-1).conversation_id === 'conv-1')
-  assert.equal((await queries()).at(-1).cursor, null)
-  await page.locator('[data-exchange-id="agent-x/m3/v1"]').waitFor()
-  assert.equal(await page.locator('[data-slot="exchange"]').count(), 2)
   await page.getByLabel('Conversation ID').fill('nope')
-  await page.getByRole('button', { name: 'Filter' }).click()
+  await pick('Filter').click()
+  await waitPending(6)
+  await release(5)
   await page.locator('[data-stub="empty-state"]').waitFor()
-  assert.match(await text(), /Nothing matches these filters/)
+  const body = await text()
+  assert.match(body, /No exchanges from available profiles/)
+  assert.match(body, /not a complete answer/)
+  assert.doesNotMatch(body, /Nothing matches these filters/)
+  await pick('Alpha bot').click()
+  await waitPending(7)
+  assert.equal((await queries()).at(-1).conversation_id, 'nope')
+  await release(6)
+  await page.getByText('Nothing matches these filters.').waitFor()
 })
 
-await check('backend error shows the error state with retry, not stale data', async () => {
-  await mount('error', fixture)
+await check('an unavailable profile shows an error, never an empty list', async () => {
+  await pick('Gamma bot').click()
+  await waitPending(8)
+  await release(7)
   await page.locator('[data-stub="error-state"]').waitFor()
   const body = await text()
   assert.match(body, /Could not load exchanges/)
-  assert.match(body, /belongs to a different profile/)
-  assert.equal(await page.locator('[data-slot="exchange"]').count(), 0)
-  await page.getByRole('button', { name: 'Retry' }).click()
-  await page.waitForFunction(() => globalThis.__queries.length === 2)
+  assert.match(body, /configured root is missing/)
+  assert.equal(await rows().count(), 0)
+  assert.equal(await page.locator('[data-stub="empty-state"]').count(), 0)
+  await pick('Retry').click()
+  await waitPending(9)
+})
+
+await check('a response for a different selection is refused, not displayed', async () => {
+  await mount('wrong-answer', fixture)
+  await waitPending(1)
+  await release(0) // asked for "all", service answers beta
+  await page.locator('[data-stub="error-state"]').waitFor()
+  assert.match(await text(), /answered a different selection; nothing shown/)
+  assert.equal(await rows().count(), 0)
 })
 
 await browser.close()

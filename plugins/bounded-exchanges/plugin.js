@@ -5,11 +5,16 @@
 // their routing state and correlated bot replies. It has no send, replay, approval or
 // subscription controls.
 //
-// BACKEND CONNECTION IS DISABLED. The read model ships in the bounded-events repository
-// (`bounded_events/exchange_view.py`, served shape from `exchange_api.handle`). No Desktop
-// backend route is mounted because the profile scope of a plugin REST call could not be
-// proven. See README.md, "Why the pane is not connected". The registered pane therefore
-// renders an explicit "not connected" state. It never shows sample data as if it were live.
+// One viewer, several profiles: an explicit "All profiles" overview (only when the operator
+// enabled it) and a per-profile view. The operator's service config lists the profiles; this
+// pane only ever sends an opaque `viewer_profile` id and filters, never a path.
+//
+// The registered pane reads through `ctx.rest` from this plugin's own backend namespace
+// (`/api/plugins/bounded-exchanges/profiles` and `/exchanges`), served by the viewer package
+// that bounded-events builds (`python3 -m bounded_events viewer-bundle`). If the host has no
+// `ctx.rest`, the pane stays "Not connected". If the route is not installed, not enabled or
+// not loaded since the last backend restart, it shows an explicit "not reachable" error. It
+// never shows sample data as if it were live.
 
 import {
   Badge,
@@ -33,37 +38,58 @@ export const PAGE_SIZE = 20
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
 const SESSION_RE = /^[\x21-\x7e]{1,256}$/
 
+export const OVERVIEW = 'all'
+
 export const CONNECTION_BLOCKER =
-  'Desktop cannot yet prove which profile a plugin backend request belongs to, so this pane ' +
-  'reads nothing. Use the terminal viewer: python3 -m bounded_events exchanges --root ROOT'
+  'This Desktop build offers plugins no backend REST access (ctx.rest), so this pane reads ' +
+  'nothing. Use the terminal viewer: python3 -m bounded_events exchanges --root ROOT'
+
+export const UNREACHABLE =
+  'The Bounded Exchanges viewer service is not reachable on this backend. It may not be ' +
+  'installed, enabled in plugins.enabled, or loaded since the last backend restart.'
 
 // ------------------------------------------------------------------ data sources
-/** The source the registered pane uses: never connected, never loads anything. */
+/** Used when the host offers no plugin REST door: never connected, never loads anything. */
 export function createDisabledSource() {
   return { kind: 'disabled', label: 'Not connected', blocker: CONNECTION_BLOCKER }
 }
 
-/** A connected source over the plugin's own backend namespace. NOT used by `register` until
- *  the backend scope seam is resolved; kept so the query contract has one definition. */
+/** The pane's source when the host offers `ctx.rest`: this plugin's own backend namespace. */
+export function sourceForContext(ctx) {
+  return ctx && typeof ctx.rest === 'function' ? createRestSource(ctx.rest) : createDisabledSource()
+}
+
 export function createRestSource(rest) {
+  const call = async path => {
+    try {
+      return await rest(path)
+    } catch (cause) {
+      // Host-level failure (404 not mounted/disabled, 401, network): the service did not answer.
+      const error = new Error(UNREACHABLE)
+      error.reason = 'service_unreachable'
+      error.cause = cause
+      throw error
+    }
+  }
+  const unwrap = reply => {
+    if (!reply || reply.ok !== true) {
+      const error = new Error((reply && reply.error && reply.error.message) || 'Request failed')
+      error.reason = (reply && reply.error && reply.error.reason) || 'request_failed'
+      throw error
+    }
+    return reply.data
+  }
   return {
     kind: 'backend',
     label: 'Backend',
-    load: async query => {
-      const reply = await rest('/exchanges' + encodeQuery(query))
-      if (!reply || reply.ok !== true) {
-        const error = new Error((reply && reply.error && reply.error.message) || 'Request failed')
-        error.reason = (reply && reply.error && reply.error.reason) || 'request_failed'
-        throw error
-      }
-      return reply.data
-    }
+    listProfiles: async () => unwrap(await call('/profiles')),
+    load: async query => unwrap(await call('/exchanges' + encodeQuery(query)))
   }
 }
 
 export function encodeQuery(query) {
   const parts = []
-  for (const key of ['limit', 'cursor', 'chat_session_id', 'conversation_id']) {
+  for (const key of ['viewer_profile', 'limit', 'cursor', 'chat_session_id', 'conversation_id']) {
     const value = query[key]
     if (value !== undefined && value !== null && value !== '') {
       parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(String(value)))
@@ -222,16 +248,18 @@ function Route({ route }) {
   })
 }
 
-function Exchange({ exchange }) {
+function Exchange({ exchange, labels }) {
   const inbound = exchange.inbound
   return jsxs('article', {
     className: 'grid gap-2 border-b border-(--ui-stroke-secondary) px-3 py-2.5',
     'data-slot': 'exchange',
     'data-exchange-id': exchange.exchange_id,
+    'data-profile': exchange.profile,
     children: [
       jsxs('div', {
         className: 'flex flex-wrap items-center gap-1 text-[0.6875rem] ' + muted,
         children: [
+          jsx(Pill, { label: labels[exchange.profile] || exchange.profile, variant: 'default' }),
           jsx('span', { className: 'font-medium text-(--ui-text-secondary)', children: exchange.counterpart.source_scope }),
           jsx(Pill, { label: 'unauthenticated source', variant: 'outline' }),
           jsx('span', { children: 'conversation ' + (exchange.conversation_id || '—') })
@@ -250,13 +278,13 @@ function Exchange({ exchange }) {
   })
 }
 
-function SubscriptionLine({ sub }) {
+function SubscriptionLine({ sub, label }) {
   return jsxs('div', {
     className: 'flex flex-wrap items-center gap-1 text-[0.6875rem] ' + muted,
     'data-slot': 'exchange-subscription',
     children: [
       jsx(Pill, {
-        label: sub.sub_id + ' g' + sub.generation + ': ' + sub.effective_state,
+        label: label + ' · ' + sub.sub_id + ' g' + sub.generation + ': ' + sub.effective_state,
         variant: sub.effective_state === 'active' ? 'success' : 'muted'
       }),
       jsx('span', { children: 'expires ' + fmtTime(sub.expires_utc) }),
@@ -278,7 +306,60 @@ function SourceBanner({ source }) {
   })
 }
 
+function ProfilePicker({ profiles, selected, onSelect }) {
+  const options = (profiles.overview ? [{ id: OVERVIEW, label: 'All profiles' }] : []).concat(profiles.profiles)
+  return jsx('div', {
+    className: 'flex flex-wrap gap-1 border-b border-(--ui-stroke-secondary) px-3 py-2',
+    role: 'group',
+    'aria-label': 'Profile',
+    'data-slot': 'exchange-profiles',
+    children: options.map(p =>
+      jsx(
+        Button,
+        {
+          type: 'button',
+          size: 'sm',
+          variant: p.id === selected ? 'secondary' : 'ghost',
+          'aria-pressed': p.id === selected,
+          onClick: () => onSelect(p.id),
+          children: p.label
+        },
+        p.id
+      )
+    )
+  })
+}
+
+/** Per-profile availability for the current selection. Never hidden: an unavailable profile
+ *  means the view is incomplete, not empty. */
+function ProfileStatus({ data }) {
+  const down = data.profiles.filter(p => p.status !== 'ok')
+  if (!down.length) {
+    return null
+  }
+  return jsxs('div', {
+    className: 'grid gap-1 border-b border-(--ui-stroke-secondary) px-3 py-2 text-[0.6875rem]',
+    'data-slot': 'exchange-incomplete',
+    role: 'status',
+    children: [
+      jsx(Pill, { label: 'Incomplete: ' + down.length + ' profile(s) unavailable', variant: 'warn' }),
+      ...down.map(p => jsx('div', { className: muted, children: p.label + ': ' + p.reason }, p.id))
+    ]
+  })
+}
+
+/** A response is shown only if it answers the request the pane is currently making. */
+export function answersRequest(data, request) {
+  if (!data || !data.selection || data.selection.profile !== request.viewer_profile) {
+    return false
+  }
+  const echoed = data.selection.filters || {}
+  return ['conversation_id', 'chat_session_id'].every(k => (echoed[k] || '') === (request[k] || ''))
+}
+
 export function ExchangePane({ source }) {
+  const [profiles, setProfiles] = useState(source.kind === 'disabled' ? null : { status: 'loading' })
+  const [selected, setSelected] = useState(null)
   const [draft, setDraft] = useState({ conversation_id: '', chat_session_id: '' })
   const [applied, setApplied] = useState({ conversation_id: '', chat_session_id: '' })
   const [cursor, setCursor] = useState(null)
@@ -291,15 +372,52 @@ export function ExchangePane({ source }) {
       return undefined
     }
     let live = true
-    setState({ status: 'loading' })
     source
-      .load({ ...applied, cursor, limit: PAGE_SIZE })
-      .then(data => live && setState({ status: 'ready', data }))
+      .listProfiles()
+      .then(data => {
+        if (!live) return
+        setProfiles({ status: 'ready', data })
+        const first = data.overview ? OVERVIEW : data.profiles[0] && data.profiles[0].id
+        setSelected(first || null)
+        if (!first) setState({ status: 'error', error: new Error('No profiles are configured for this viewer.') })
+      })
+      .catch(error => {
+        if (!live) return
+        setProfiles({ status: 'error', error })
+        setState({ status: 'error', error })
+      })
+    return () => {
+      live = false
+    }
+  }, [source])
+
+  useEffect(() => {
+    if (source.kind === 'disabled' || !selected) {
+      return undefined
+    }
+    let live = true
+    const request = { viewer_profile: selected, ...applied, cursor, limit: PAGE_SIZE }
+    setState({ status: 'loading' }) // switching never leaves another selection's rows on screen
+    source
+      .load(request)
+      .then(data => {
+        if (!live) return
+        if (!answersRequest(data, request)) {
+          setState({ status: 'error', error: new Error('The service answered a different selection; nothing shown.') })
+          return
+        }
+        setState({ status: 'ready', data })
+      })
       .catch(error => live && setState({ status: 'error', error }))
     return () => {
       live = false
     }
-  }, [source, applied, cursor, nonce])
+  }, [source, selected, applied, cursor, nonce])
+
+  const selectProfile = useCallback(id => {
+    setCursor(null) // cursors belong to one profile + filter selection
+    setSelected(id)
+  }, [])
 
   const apply = useCallback(() => {
     const problem = validateFilters(draft)
@@ -309,6 +427,11 @@ export function ExchangePane({ source }) {
       setCursor(null)
     }
   }, [draft])
+
+  const labels = {}
+  if (profiles && profiles.status === 'ready') {
+    for (const p of profiles.data.profiles) labels[p.id] = p.label
+  }
 
   const filterBar = jsxs('form', {
     className: 'grid gap-1.5 border-b border-(--ui-stroke-secondary) px-3 py-2',
@@ -371,24 +494,43 @@ export function ExchangePane({ source }) {
       children: jsx(Button, { size: 'sm', variant: 'outline', onClick: () => setNonce(n => n + 1), children: 'Retry' })
     })
   } else if (!state.data.exchanges.length) {
-    body = jsx(EmptyState, {
-      title: 'No exchanges',
-      description: applied.conversation_id || applied.chat_session_id ? 'Nothing matches these filters.' : 'No inbound messages recorded yet.'
-    })
-  } else {
-    const page = state.data.page
+    const filtered = applied.conversation_id || applied.chat_session_id
     body = jsxs('div', {
       className: 'grid',
       children: [
+        jsx(ProfileStatus, { data: state.data }),
+        jsx(EmptyState, {
+          title: state.data.complete ? 'No exchanges' : 'No exchanges from available profiles',
+          description: !state.data.complete
+            ? 'Some profiles could not be read, so this is not a complete answer.'
+            : filtered
+              ? 'Nothing matches these filters.'
+              : 'No inbound messages recorded yet.'
+        })
+      ]
+    })
+  } else {
+    const page = state.data.page
+    const overview = state.data.selection.profile === OVERVIEW
+    body = jsxs('div', {
+      className: 'grid',
+      children: [
+        jsx(ProfileStatus, { data: state.data }),
         jsx('div', {
           className: 'grid gap-1 border-b border-(--ui-stroke-secondary) px-3 py-2',
-          children: state.data.subscriptions.map(sub => jsx(SubscriptionLine, { sub }, sub.sub_id + ':' + sub.generation))
+          children: state.data.subscriptions.map(sub =>
+            jsx(SubscriptionLine, { sub, label: labels[sub.profile] || sub.profile }, sub.profile + ':' + sub.sub_id + ':' + sub.generation)
+          )
         }),
-        ...state.data.exchanges.map(exchange => jsx(Exchange, { exchange }, exchange.exchange_id)),
+        ...state.data.exchanges.map(exchange => jsx(Exchange, { exchange, labels }, exchange.item_key)),
         jsxs('div', {
           className: 'flex items-center justify-between gap-2 px-3 py-2 text-[0.6875rem] ' + muted,
           children: [
-            jsx('span', { children: page.returned + ' of ' + page.total_matching + ', newest first' }),
+            jsx('span', {
+              children: overview
+                ? page.returned + ' newest across profiles' + (page.truncated ? '; select a profile to see more' : '')
+                : page.returned + ' of ' + page.total_matching + ', newest first'
+            }),
             jsxs('div', {
               className: 'flex gap-1.5',
               children: [
@@ -419,6 +561,9 @@ export function ExchangePane({ source }) {
         children: 'Exchanges · read-only'
       }),
       jsx(SourceBanner, { source }),
+      profiles && profiles.status === 'ready'
+        ? jsx(ProfilePicker, { profiles: profiles.data, selected, onSelect: selectProfile })
+        : null,
       filterBar,
       body
     ]
@@ -431,7 +576,7 @@ export default {
   name: 'Bounded Exchanges',
   defaultEnabled: false,
   register(ctx) {
-    const source = createDisabledSource()
+    const source = sourceForContext(ctx)
     const render = () => jsx(ExchangePane, { source })
     ctx.registerMany([
       {

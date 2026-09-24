@@ -177,6 +177,18 @@ try {
       const roles = await page.evaluate(() => { const s = getComputedStyle(document.documentElement); return Object.fromEntries(['--nebula-cyan', '--nebula-gold', '--nebula-lavender', '--nebula-accent', '--nebula-magenta', '--nebula-blue', '--nebula-warm', '--nebula-meta', '--nebula-placeholder', '--ui-text-quaternary', '--ui-stroke-secondary', '--ui-bg-input', '--ui-success', '--ui-warning', '--ui-danger'].map(k => [k, s.getPropertyValue(k).trim()])) })
       assert.deepEqual(roles, { '--nebula-cyan': '#47d9ff', '--nebula-gold': '#ffd86a', '--nebula-lavender': '#b35cff', '--nebula-accent': '#8d63ff', '--nebula-magenta': '#f05cff', '--nebula-blue': '#497bff', '--nebula-warm': '#ffb878', '--nebula-meta': '#b8b4d9', '--nebula-placeholder': '#7e82ae', '--ui-text-quaternary': '#7e82ae', '--ui-stroke-secondary': '#3e55d9', '--ui-bg-input': '#1b2252', '--ui-success': '#52e6b4', '--ui-warning': '#ffc857', '--ui-danger': '#ff6584' })
     }
+    const codeBackdrops = await page.evaluate(() => {
+      const slots = ['code-card', 'diff-lines', 'file-diff-panel'];
+      return slots.map(slot => {
+        const el = document.createElement(slot === 'diff-lines' ? 'pre' : 'div');
+        el.dataset.slot = slot;
+        document.querySelector('#shell').append(el);
+        const bg = getComputedStyle(el).backgroundColor;
+        el.remove();
+        return [slot, bg];
+      });
+    });
+    for (const [slot, bg] of codeBackdrops) assert.equal(alpha(bg), 1, `${slot} must block the wallpaper: ${bg}`);
     const veil = await page.locator('#panel').evaluate(e => getComputedStyle(e.querySelector('.pane-layer')).backgroundColor)
     assert(alpha(veil) > 0.3 && alpha(veil) < 0.9, 'content surface is translucent over the wallpaper: ' + veil)
     const bar = await page.locator('#statusbar').evaluate(e => getComputedStyle(e).backgroundColor)

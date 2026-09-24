@@ -153,6 +153,13 @@ ${sparkle ? `
   border-color: var(--dt-user-bubble-border);
   box-shadow: var(--nebula-glow);
 }
+/* Code and diff text need a solid reading surface over the wallpaper.
+   Keep diff add/remove tints on their child rows, not on the backdrop. */
+:root[data-hermes-theme="nebula"] :is([data-slot="code-card"], [data-slot="diff-lines"], [data-slot="file-diff-panel"]) {
+  --ui-bg-editor: rgb(from var(--theme-card-seed) r g b / 1);
+  --expandable-fade-from: var(--ui-bg-editor);
+  background-color: var(--ui-bg-editor) !important;
+}
 :root[data-hermes-theme="nebula"] [data-slot="code-card"] {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 60%, transparent);
 }

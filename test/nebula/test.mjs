@@ -195,7 +195,7 @@ try {
     }
     assert.equal(await page.locator('#tab-active').evaluate(e => getComputedStyle(e).fontWeight), '700', 'tabs are bold')
     if (mode === 'dark') {
-      assert.equal(await page.locator('#project-label').evaluate(e => getComputedStyle(e).color), 'rgb(244, 241, 255)', 'project labels use starlight ink')
+      assert.equal(await page.locator('#project-label').evaluate(e => getComputedStyle(e).color), 'rgb(213, 184, 255)', 'project labels use soft lavender ink')
       assert.equal(await page.locator('#project-label').evaluate(e => getComputedStyle(e).fontWeight), '600')
       assert.notEqual(await page.locator('#pinned-label').evaluate(e => getComputedStyle(e).color), 'rgb(141, 99, 255)', 'section headings are lighter than the primary accent')
     }

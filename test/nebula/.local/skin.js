@@ -63,7 +63,7 @@ ${wallpaper ? `
   font-weight: 700;
 }
 :root[data-hermes-theme="nebula"][data-hermes-mode="dark"] [data-tour="sessions-sidebar"] [data-sessions-project] [data-slot="row-button"].p-0 > span {
-  color: #f4f1ff;
+  color: #d5b8ff;
   font-weight: 600;
 }
 :root[data-hermes-theme="nebula"][data-hermes-mode="dark"] [data-tour="sessions-sidebar"] span[class~="tracking-[0.16em]"] {

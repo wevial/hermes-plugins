@@ -1,8 +1,8 @@
-# Nebula Skin
+# Cosmos Skin
 
-Optional decoration for the [Nebula Theme](../nebula-theme/README.md): a pixel-art "station" space wallpaper behind the window, translucent content surfaces over it, lavender glow rims on the sidebar, pane bodies and composer, outlined cyan-icon navigation pills, a lavender scrollbar, a monospace status bar and the empty-chat wordmark set in the Silkscreen pixel face.
+Optional decoration for the [Cosmos Theme](../nebula-theme/README.md): a pixel-art "station" space wallpaper behind the window, translucent content surfaces over it, lavender glow rims on the sidebar, pane bodies and composer, outlined cyan-icon navigation pills, a lavender scrollbar, a monospace status bar and the empty-chat wordmark set in the Silkscreen pixel face.
 
-The skin only paints while the Nebula theme is selected; enabling it under another theme changes nothing. Native sizes, padding, hit areas, drag regions and body fonts are untouched. Registration is inert: use **⌘K → Enable Nebula skin** (or Toggle/Disable). Your choice is remembered per client and restored on the next launch.
+The skin only paints while the Cosmos theme is selected; enabling it under another theme changes nothing. Native sizes, padding, hit areas, drag regions and body fonts are untouched. Registration is inert: use **⌘K → Enable Cosmos skin** (or Toggle/Disable). Your choice is remembered per client and restored on the next launch.
 
 ## Installation
 

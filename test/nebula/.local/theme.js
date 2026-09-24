@@ -1,12 +1,12 @@
-// Nebula — a deep-indigo space palette for Hermes Desktop. © 2026 Ko Vial, MIT.
-// Palette + color-only bridges. Wallpaper, bevelled rims and the pixel wordmark
+// Cosmos — a deep-indigo space palette for Hermes Desktop. © 2026 Ko Vial, MIT.
+// Palette + color-only bridges. Wallpaper, glow rims and the pixel wordmark
 // live in the separate, opt-in `nebula-skin` plugin.
 import { THEMES_AREA } from 'data:text/javascript;base64,ZXhwb3J0IGNvbnN0IFRIRU1FU19BUkVBPSd0aGVtZXMnOyBleHBvcnQgY29uc3QgUEFMRVRURV9BUkVBPSJwYWxldHRlIjsgZXhwb3J0IGNvbnN0IGhvc3Q9e25vdGlmeTpuPT5nbG9iYWxUaGlzLm5vdGlmaWNhdGlvbnMucHVzaChuKX07'
 
 export const theme = {
   name: 'nebula',
-  label: 'Nebula',
-  description: 'Deep indigo field, lavender rims, cyan and gold accents. Pairs with the optional Nebula Skin for the wallpaper and bevels.',
+  label: 'Cosmos',
+  description: 'Deep indigo field, lavender rims, cyan and gold accents. Pairs with the optional Cosmos Skin for the wallpaper and glow.',
   colors: {
     background: '#e6e3ff', foreground: '#24215a',
     card: '#efecff', cardForeground: '#24215a',
@@ -137,8 +137,8 @@ export const colorCss = `
 `
 
 export default {
-  id: 'nebula-theme', name: 'Nebula Theme',
-  description: 'Registers the Nebula palette without selecting it. Wallpaper and bevels are the separate Nebula Skin plugin.',
+  id: 'nebula-theme', name: 'Cosmos Theme',
+  description: 'Registers the Cosmos palette without selecting it. Wallpaper and glow are the separate Cosmos Skin plugin.',
   register(ctx) {
     ctx.register({ id: 'palette', area: THEMES_AREA, data: theme })
     const style = document.createElement('style')

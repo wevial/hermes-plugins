@@ -1,5 +1,5 @@
-// Nebula Skin — station wallpaper, lavender glow rims and a pixel wordmark for
-// the Nebula theme. © 2026 Ko Vial, MIT. Silkscreen font © The Silkscreen
+// Cosmos Skin — station wallpaper, lavender glow rims and a pixel wordmark for
+// the Cosmos theme. © 2026 Ko Vial, MIT. Silkscreen font © The Silkscreen
 // Project Authors, SIL OFL 1.1 (assets/OFL-Silkscreen.txt).
 import { PALETTE_AREA, host } from '@hermes/plugin-sdk'
 
@@ -7,7 +7,7 @@ const WALLPAPER_FILE = 'nebula-station.webp'
 const FONT_FILE = 'silkscreen.woff2'
 const SPARKLE_FILE = 'sparkle.png'
 
-// Everything is scoped to the Nebula theme so enabling the skin on another
+// Everything is scoped to the Cosmos theme so enabling the skin on another
 // palette changes nothing. Native sizes, padding, hit areas, drag regions and
 // body fonts are preserved; only paint changes. Overlays that must sit above
 // opaque pane children are pointer-transparent ::after rims (same approach as
@@ -186,8 +186,8 @@ async function loadAsset(file) {
 }
 
 export default {
-  id: 'nebula-skin', name: 'Nebula Skin', defaultEnabled: false,
-  description: 'Optional station wallpaper, lavender glow rims and pixel wordmark for the Nebula theme. Remembers your palette command choice.',
+  id: 'nebula-skin', name: 'Cosmos Skin', defaultEnabled: false,
+  description: 'Optional station wallpaper, lavender glow rims and pixel wordmark for the Cosmos theme. Remembers your palette command choice.',
   register(ctx) {
     let style = null
     let disposed = false
@@ -199,7 +199,7 @@ export default {
       if (assets) return assets
       const [wallpaper, font, sparkle] = await Promise.all([loadAsset(WALLPAPER_FILE), loadAsset(FONT_FILE), loadAsset(SPARKLE_FILE)].map(p => p.catch(() => null)))
       assets = { wallpaper, font, sparkle }
-      if (!wallpaper && !disposed) host.notify({ kind: 'error', message: 'Nebula wallpaper could not be read; the skin is on without it. Is assets/nebula-station.webp installed?' })
+      if (!wallpaper && !disposed) host.notify({ kind: 'error', message: 'Cosmos wallpaper could not be read; the skin is on without it. Is assets/nebula-station.webp installed?' })
       return assets
     }
     const apply = async enabled => {
@@ -220,10 +220,10 @@ export default {
       pendingSave = pendingSave.then(() => applied).then(() => ctx.storage.set('enabled', enabled))
         .then(() => {
           if (!disposed) host.notify({ kind: 'info', message: enabled
-            ? 'Nebula skin is ON (shows with the Nebula theme) and will be restored next launch.'
-            : 'Nebula skin is OFF. Theme and fonts are unchanged.' })
+            ? 'Cosmos skin is ON (shows with the Cosmos theme) and will be restored next launch.'
+            : 'Cosmos skin is OFF. Theme and fonts are unchanged.' })
         }).catch(() => {
-          if (!disposed) host.notify({ kind: 'error', message: 'Nebula skin changed, but its preference could not be saved.' })
+          if (!disposed) host.notify({ kind: 'error', message: 'Cosmos skin changed, but its preference could not be saved.' })
         })
       return pendingSave
     }
@@ -232,13 +232,13 @@ export default {
     Promise.resolve().then(() => ctx.storage.get('enabled')).then(enabled => {
       if (!userChanged && !disposed) return apply(enabled === true)
     }).catch(() => {
-      if (!disposed && !userChanged) host.notify({ kind: 'error', message: 'Could not restore the Nebula skin preference; use the palette to enable it.' })
+      if (!disposed && !userChanged) host.notify({ kind: 'error', message: 'Could not restore the Cosmos skin preference; use the palette to enable it.' })
     })
     for (const [id, label, run] of [
-      ['enable', 'Enable Nebula skin', enable],
-      ['disable', 'Disable Nebula skin', disable],
-      ['toggle', 'Toggle Nebula skin', () => style ? disable() : enable()]
-    ]) ctx.register({ id, area: PALETTE_AREA, data: { label, keywords: ['nebula', 'space', 'skin', 'wallpaper'], run } })
+      ['enable', 'Enable Cosmos skin', enable],
+      ['disable', 'Disable Cosmos skin', disable],
+      ['toggle', 'Toggle Cosmos skin', () => style ? disable() : enable()]
+    ]) ctx.register({ id, area: PALETTE_AREA, data: { label, keywords: ['cosmos', 'nebula', 'space', 'skin', 'wallpaper'], run } })
     ctx.onDispose(() => { disposed = true; removeStyle() })
   }
 }

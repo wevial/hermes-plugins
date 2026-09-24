@@ -19,6 +19,7 @@
 import {
   Badge,
   Button,
+  DisclosureCaret,
   EmptyState,
   ErrorState,
   host,
@@ -169,6 +170,37 @@ export function replyLabels(reply) {
   return labels
 }
 
+// The counterpart's name comes only from the operator's configuration of the subscription
+// generation that routed the message (backend `counterpart.attribution`). Nothing here reads
+// a name from the payload or turns the source scope into an identity.
+const UNKNOWN_WHY = {
+  unconfigured: 'unconfigured',
+  conflicting: 'routes disagree',
+  invalid: 'invalid configuration'
+}
+
+/** { name, note, title, configured } for an exchange's or route's `counterpart`. */
+export function counterpartLabel(cp) {
+  if (cp && cp.attribution === 'configured' && typeof cp.display_name === 'string') {
+    return {
+      configured: true,
+      name: visibleText(cp.display_name),
+      note: 'Configured source · not authenticated',
+      title:
+        'Name from the operator’s configuration for this subscription (id ' +
+        visibleText(String(cp.counterpart_id)) +
+        '). It is not a verified identity of whoever wrote the message.'
+    }
+  }
+  const why = UNKNOWN_WHY[cp && cp.attribution] || 'unconfigured'
+  return {
+    configured: false,
+    name: 'Unknown source',
+    note: why + ' · not authenticated',
+    title: 'No operator-configured name applies to this message, so the sender is unknown.'
+  }
+}
+
 function fmtTime(iso) {
   if (typeof iso !== 'string') {
     return ''
@@ -177,115 +209,263 @@ function fmtTime(iso) {
 }
 
 // ------------------------------------------------------------------------ view
+// Layout: the conversation first (who wrote what, and what the bot answered), the routing
+// and identity metadata one "Details" click away. Warnings that change what the reviewer
+// should believe (incomplete results, unconfirmed or failed handoff, file problems) stay
+// visible; routine states become one quiet status line.
+//
+// Styling uses only utility classes the Desktop stylesheet already generates (its Tailwind build
+// does not scan plugin files); layout values it lacks go through inline `style`.
 const muted = 'text-(--ui-text-tertiary)'
+const caption = 'text-[0.6875rem] leading-4'
+const rule = 'border-(--ui-stroke-secondary)'
 
 function Pill({ label, variant }) {
   return jsx(Badge, { variant, children: label })
 }
 
-function Message({ who, at, text, truncated }) {
+function Time({ at }) {
+  if (typeof at !== 'string') {
+    return null
+  }
+  return jsx('time', {
+    className: 'shrink-0 tabular-nums ' + muted,
+    dateTime: at,
+    title: at,
+    children: fmtTime(at).replace(/:\d\dZ$/, 'Z')
+  })
+}
+
+/** Button that shows/hides a region; the region is only rendered while open. */
+function Toggle({ open, onToggle, controls, label, extra, disabled, slot }) {
+  return jsxs(Button, {
+    type: 'button',
+    size: 'xs',
+    variant: open ? 'secondary' : 'ghost',
+    'aria-expanded': open,
+    'aria-controls': controls,
+    'data-slot': slot,
+    disabled,
+    onClick: onToggle,
+    children: [jsx(DisclosureCaret, { open, 'aria-hidden': true }), label, extra || null]
+  })
+}
+
+function Bubble({ direction, who, at, text, truncated, status }) {
+  const inbound = direction === 'in'
   return jsxs('div', {
-    className: 'grid gap-1',
+    className:
+      'grid min-w-0 gap-1 rounded-md border px-2.5 py-2 ' +
+      rule +
+      (inbound ? ' bg-(--ui-bg-tertiary)' : ' ml-4 bg-(--ui-chat-bubble-background)'),
+    'data-slot': inbound ? 'exchange-inbound' : 'exchange-reply',
     children: [
       jsxs('div', {
-        className: 'flex items-baseline justify-between gap-2 text-[0.6875rem] ' + muted,
-        children: [jsx('span', { children: who }), jsx('span', { children: fmtTime(at) })]
+        className: 'flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 ' + caption,
+        children: [
+          // Wraps rather than truncates: a reply header names both ends (bot → source), and cutting it
+          // at a narrow pane hid the counterpart entirely (real-Desktop capture 27-narrow-delta-long).
+          jsx('span', {
+            className: 'min-w-0 break-words font-medium text-(--ui-text-secondary)',
+            'data-slot': 'exchange-bubble-who',
+            children: who
+          }),
+          status || null,
+          jsx('span', { className: 'flex-1' }),
+          jsx(Time, { at })
+        ]
       }),
       jsx('div', {
-        className:
-          'whitespace-pre-wrap break-words rounded-md border border-(--ui-stroke-secondary) px-2 py-1.5 text-xs text-(--ui-text-secondary)',
+        className: 'whitespace-pre-wrap break-words text-[0.8125rem] leading-5 text-(--ui-text-primary)',
         'data-slot': 'exchange-text',
         children: text === null || text === undefined ? jsx('span', { className: muted, children: '(no text)' }) : visibleText(text)
       }),
-      truncated ? jsx('div', { className: 'text-[0.6875rem] ' + muted, children: 'Truncated for display.' }) : null
+      truncated ? jsx('div', { className: caption + ' ' + muted, children: 'Truncated for display.' }) : null
     ]
   })
 }
 
-function Route({ route }) {
+/** Handoff/subscription states worth a badge; the routine ones join the quiet status line. */
+function routeStatus(route) {
   const handoff = handoffLabel(route.handoff)
   const delivery = hostDeliveryLabel(route.host_delivery)
+  const loud = []
+  const quiet = []
+  ;(handoff.variant === 'muted' ? quiet : loud).push(handoff)
+  quiet.push(delivery)
+  if (route.subscription.effective_state !== 'active') {
+    loud.push({ label: 'Subscription ' + route.subscription.effective_state, variant: 'muted' })
+  }
+  return { loud, quiet }
+}
+
+function Route({ route, botLabel }) {
+  const { loud, quiet } = routeStatus(route)
+  const reply = route.reply
+  let replyPart
+  if (reply) {
+    const [publication, ...rest] = replyLabels(reply)
+    const receipt = rest.pop()
+    // A reply goes back along its own route, so it names that route's configured source.
+    replyPart = jsx(Bubble, {
+      direction: 'out',
+      who: 'Reply · ' + botLabel + ' → ' + counterpartLabel(route.counterpart).name,
+      at: reply.created_utc,
+      text: reply.text,
+      truncated: reply.text_truncated,
+      status: jsxs('span', {
+        className: 'flex flex-wrap items-center gap-1',
+        children: [
+          jsx(Pill, publication),
+          ...rest.map(l => jsx(Pill, l, l.label)),
+          // Publication is our side only; whether the other agent read it is a separate fact.
+          jsx('span', { className: muted, 'data-slot': 'exchange-receipt', children: receipt.label })
+        ]
+      })
+    })
+  } else {
+    replyPart = jsx('div', {
+      className: 'ml-4 ' + caption + ' ' + muted,
+      'data-slot': 'exchange-no-reply',
+      children: route.reply_allowance === 'open' ? 'No reply yet (one reply allowed).' : 'No reply expected.'
+    })
+  }
   return jsxs('div', {
-    className: 'grid gap-1.5 border-l border-(--ui-stroke-secondary) pl-2',
+    className: 'grid min-w-0 gap-1.5',
     'data-slot': 'exchange-route',
     children: [
       jsxs('div', {
-        className: 'flex flex-wrap items-center gap-1',
+        className: 'ml-4 flex min-w-0 flex-wrap items-center gap-1 ' + caption + ' ' + muted,
+        'data-slot': 'exchange-route-status',
         children: [
-          jsx(Pill, handoff),
-          jsx(Pill, delivery),
-          route.subscription.effective_state !== 'active'
-            ? jsx(Pill, { label: 'Subscription ' + route.subscription.effective_state, variant: 'muted' })
-            : null,
-          route.handoff.reason ? jsx('span', { className: 'text-[0.6875rem] ' + muted, children: visibleText(route.handoff.reason) }) : null
+          ...loud.map(l => jsx(Pill, l, l.label)),
+          jsx('span', { children: quiet.map(l => l.label).join(' · ') })
         ]
       }),
-      jsx('div', {
-        className: 'text-[0.6875rem] ' + muted,
-        children: 'chat ' + (route.chat_session_id || '—') + ' · ' + route.sub_id + ' g' + route.generation
-      }),
-      route.reply
-        ? jsxs('div', {
-            className: 'grid gap-1',
-            children: [
-              jsx('div', {
-                className: 'flex flex-wrap gap-1',
-                children: replyLabels(route.reply).map(l => jsx(Pill, l, l.label))
-              }),
-              jsx(Message, {
-                who: 'Bot reply',
-                at: route.reply.created_utc,
-                text: route.reply.text,
-                truncated: route.reply.text_truncated
-              })
-            ]
-          })
-        : jsx('div', {
-            className: 'text-[0.6875rem] ' + muted,
-            children: route.reply_allowance === 'open' ? 'No reply yet (one reply allowed).' : 'No reply expected.'
-          })
+      replyPart
     ]
   })
 }
 
-function Exchange({ exchange, labels }) {
+function DetailRow({ term, value }) {
+  return jsxs('div', {
+    className: 'grid min-w-0 gap-2',
+    style: { gridTemplateColumns: 'minmax(5rem, 7.5rem) minmax(0, 1fr)' },
+    children: [
+      jsx('dt', { className: muted, children: term }),
+      jsx('dd', { className: 'min-w-0 break-words text-(--ui-text-secondary)', children: value })
+    ]
+  })
+}
+
+function ExchangeDetails({ exchange, id }) {
   const inbound = exchange.inbound
+  const cp = exchange.counterpart
+  const source = counterpartLabel(cp)
+  const rows = [
+    ['Record', inbound.record_id + ' v' + inbound.version],
+    ['Conversation', exchange.conversation_id || '—'],
+    ['Source', source.configured ? source.name + ' [' + visibleText(String(cp.counterpart_id)) + '] · ' + source.note : source.name + ' (' + source.note + ')'],
+    ['Source scope', cp.source_scope + ' (unauthenticated source)'],
+    ['Observed', fmtTime(inbound.observed_utc) || '—']
+  ]
+  if (source.configured) {
+    // The name is the current configuration; it may have been set after the message arrived.
+    rows.splice(3, 0, [
+      'Source named',
+      fmtTime(cp.configured_utc) + (cp.configured_after_observation ? ' (after this message was observed)' : '')
+    ])
+  }
+  exchange.routes.forEach((route, i) => {
+    const p = exchange.routes.length > 1 ? 'Route ' + (i + 1) + ' ' : ''
+    if (exchange.routes.length > 1) {
+      const r = counterpartLabel(route.counterpart)
+      rows.push([p + 'Source', r.configured ? r.name + ' [' + visibleText(String(route.counterpart.counterpart_id)) + ']' : r.name + ' (' + r.note + ')'])
+    }
+    rows.push([p + 'Subscription', route.sub_id + ' g' + route.generation + ' (' + route.subscription.effective_state + ')'])
+    rows.push([p + 'Chat session', route.chat_session_id || '—'])
+    rows.push([p + 'Handoff', handoffLabel(route.handoff).label + (route.handoff.reason ? ': ' + visibleText(route.handoff.reason) : '')])
+    rows.push([p + 'Chat delivery', hostDeliveryLabel(route.host_delivery).label])
+    rows.push([p + 'Reply allowance', String(route.reply_allowance)])
+    if (route.reply) {
+      rows.push([p + 'Reply', replyLabels(route.reply).map(l => l.label).join(' · ')])
+      rows.push([p + 'Reply written', fmtTime(route.reply.created_utc) || '—'])
+    }
+  })
+  return jsx('dl', {
+    id,
+    className: 'grid min-w-0 gap-1 rounded-md border border-dashed px-2.5 py-2 ' + rule + ' ' + caption,
+    'data-slot': 'exchange-details',
+    children: rows.map(([term, value]) => jsx(DetailRow, { term, value }, term))
+  })
+}
+
+function Exchange({ exchange, labels, overview }) {
+  const [open, setOpen] = useState(false)
+  const inbound = exchange.inbound
+  const botLabel = labels[exchange.profile] || exchange.profile
+  const detailsId = 'bx-details-' + String(exchange.item_key).replace(/[^A-Za-z0-9_-]/g, '_')
+  const source = counterpartLabel(exchange.counterpart)
   return jsxs('article', {
-    className: 'grid gap-2 border-b border-(--ui-stroke-secondary) px-3 py-2.5',
+    className: 'grid min-w-0 gap-2 border-b px-3 py-3 ' + rule,
     'data-slot': 'exchange',
     'data-exchange-id': exchange.exchange_id,
     'data-profile': exchange.profile,
+    'aria-label': 'Message from ' + source.name + ' to ' + botLabel,
     children: [
       jsxs('div', {
-        className: 'flex flex-wrap items-center gap-1 text-[0.6875rem] ' + muted,
+        className: 'flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 ' + caption + ' ' + muted,
         children: [
-          jsx(Pill, { label: labels[exchange.profile] || exchange.profile, variant: 'default' }),
-          jsx('span', { className: 'font-medium text-(--ui-text-secondary)', children: exchange.counterpart.source_scope }),
-          jsx(Pill, { label: 'unauthenticated source', variant: 'outline' }),
-          jsx('span', { children: 'conversation ' + (exchange.conversation_id || '—') })
+          overview ? jsx(Pill, { label: botLabel, variant: 'default' }) : null,
+          jsxs('span', {
+            className: 'min-w-0 break-words text-xs font-medium text-(--ui-text-primary)',
+            'data-slot': 'exchange-direction',
+            'data-attribution': exchange.counterpart.attribution || 'unconfigured',
+            title: source.title,
+            children: [source.name, ' → ', botLabel]
+          }),
+          jsx('span', { className: 'min-w-0 break-words', 'data-slot': 'exchange-source-note', title: source.title, children: source.note }),
+          exchange.conversation_id ? jsx('span', { className: 'min-w-0 truncate', children: '· ' + exchange.conversation_id }) : null
         ]
       }),
-      jsx(Message, {
-        who: 'Inbound ' + inbound.record_id + ' v' + inbound.version,
+      jsx(Bubble, {
+        direction: 'in',
+        who: 'Inbound',
         at: inbound.observed_utc,
         text: inbound.text,
         truncated: inbound.text_truncated
       }),
       exchange.routes.length
-        ? exchange.routes.map(route => jsx(Route, { route }, route.sub_id + ':' + route.generation))
-        : jsx('div', { className: 'text-[0.6875rem] ' + muted, children: 'Not routed: no subscription matched.' })
+        ? exchange.routes.map(route => jsx(Route, { route, botLabel }, route.sub_id + ':' + route.generation))
+        : jsx('div', { className: 'ml-4 ' + caption + ' ' + muted, children: 'Not routed: no subscription matched.' }),
+      jsx('div', {
+        className: 'flex',
+        children: jsx(Toggle, {
+          open,
+          onToggle: () => setOpen(v => !v),
+          controls: detailsId,
+          label: 'Details',
+          slot: 'exchange-details-toggle'
+        })
+      }),
+      open ? jsx(ExchangeDetails, { exchange, id: detailsId }) : null
     ]
   })
 }
 
 function SubscriptionLine({ sub, label }) {
   return jsxs('div', {
-    className: 'flex flex-wrap items-center gap-1 text-[0.6875rem] ' + muted,
+    className: 'flex min-w-0 flex-wrap items-center gap-1 ' + caption + ' ' + muted,
     'data-slot': 'exchange-subscription',
     children: [
       jsx(Pill, {
         label: label + ' · ' + sub.sub_id + ' g' + sub.generation + ': ' + sub.effective_state,
         variant: sub.effective_state === 'active' ? 'success' : 'muted'
+      }),
+      jsx('span', {
+        'data-slot': 'exchange-subscription-source',
+        title: counterpartLabel(sub.counterpart).title,
+        children: 'from ' + counterpartLabel(sub.counterpart).name + ' (' + sub.source_scope + ')'
       }),
       jsx('span', { children: 'expires ' + fmtTime(sub.expires_utc) }),
       sub.reply_binding
@@ -300,33 +480,25 @@ function SourceBanner({ source }) {
     return null
   }
   return jsx('div', {
-    className: 'border-b border-(--ui-stroke-secondary) px-3 py-1.5 text-[0.6875rem] ' + muted,
+    className: 'border-b px-3 py-1.5 ' + rule + ' ' + caption + ' ' + muted,
     'data-slot': 'exchange-source',
     children: source.kind === 'fixture' ? 'ISOLATED FIXTURE: synthetic data, not a live backend.' : source.label
   })
 }
 
+/** A native select: one line whatever the profile count, fully keyboard-operable. */
 function ProfilePicker({ profiles, selected, onSelect }) {
   const options = (profiles.overview ? [{ id: OVERVIEW, label: 'All profiles' }] : []).concat(profiles.profiles)
-  return jsx('div', {
-    className: 'flex flex-wrap gap-1 border-b border-(--ui-stroke-secondary) px-3 py-2',
-    role: 'group',
+  return jsx('select', {
+    className:
+      'h-7 min-w-0 flex-1 rounded-[3px] border bg-transparent px-1.5 text-xs text-(--ui-text-primary) outline-none focus-visible:ring-[0.1875rem] focus-visible:ring-ring/50 ' +
+      rule,
     'aria-label': 'Profile',
     'data-slot': 'exchange-profiles',
-    children: options.map(p =>
-      jsx(
-        Button,
-        {
-          type: 'button',
-          size: 'sm',
-          variant: p.id === selected ? 'secondary' : 'ghost',
-          'aria-pressed': p.id === selected,
-          onClick: () => onSelect(p.id),
-          children: p.label
-        },
-        p.id
-      )
-    )
+    style: { flexBasis: '10rem' },
+    value: selected || '',
+    onChange: event => onSelect(event.target.value),
+    children: options.map(p => jsx('option', { value: p.id, children: p.label }, p.id))
   })
 }
 
@@ -338,12 +510,18 @@ function ProfileStatus({ data }) {
     return null
   }
   return jsxs('div', {
-    className: 'grid gap-1 border-b border-(--ui-stroke-secondary) px-3 py-2 text-[0.6875rem]',
+    className: 'grid gap-1 border-b px-3 py-2 ' + rule + ' ' + caption,
     'data-slot': 'exchange-incomplete',
     role: 'status',
     children: [
-      jsx(Pill, { label: 'Incomplete: ' + down.length + ' profile(s) unavailable', variant: 'warn' }),
-      ...down.map(p => jsx('div', { className: muted, children: p.label + ': ' + p.reason }, p.id))
+      jsxs('div', {
+        className: 'flex flex-wrap items-center gap-1.5',
+        children: [
+          jsx(Pill, { label: 'Incomplete: ' + down.length + ' profile(s) unavailable', variant: 'warn' }),
+          jsx('span', { className: muted, children: 'Results below leave these out.' })
+        ]
+      }),
+      ...down.map(p => jsx('div', { className: 'text-(--ui-text-secondary)', children: p.label + ': ' + p.reason }, p.id))
     ]
   })
 }
@@ -357,15 +535,19 @@ export function answersRequest(data, request) {
   return ['conversation_id', 'chat_session_id'].every(k => (echoed[k] || '') === (request[k] || ''))
 }
 
+const EMPTY_FILTERS = { conversation_id: '', chat_session_id: '' }
+
 export function ExchangePane({ source }) {
   const [profiles, setProfiles] = useState(source.kind === 'disabled' ? null : { status: 'loading' })
   const [selected, setSelected] = useState(null)
-  const [draft, setDraft] = useState({ conversation_id: '', chat_session_id: '' })
-  const [applied, setApplied] = useState({ conversation_id: '', chat_session_id: '' })
+  const [draft, setDraft] = useState(EMPTY_FILTERS)
+  const [applied, setApplied] = useState(EMPTY_FILTERS)
   const [cursor, setCursor] = useState(null)
   const [state, setState] = useState(source.kind === 'disabled' ? { status: 'disabled' } : { status: 'loading' })
   const [invalid, setInvalid] = useState(null)
   const [nonce, setNonce] = useState(0)
+  const [panel, setPanel] = useState(null) // 'filters' | 'subscriptions' | null
+  const [aboutOpen, setAboutOpen] = useState(false)
 
   useEffect(() => {
     if (source.kind === 'disabled') {
@@ -428,13 +610,59 @@ export function ExchangePane({ source }) {
     }
   }, [draft])
 
+  const clear = useCallback(() => {
+    setInvalid(null)
+    setDraft(EMPTY_FILTERS)
+    setApplied(EMPTY_FILTERS)
+    setCursor(null)
+  }, [])
+
   const labels = {}
   if (profiles && profiles.status === 'ready') {
     for (const p of profiles.data.profiles) labels[p.id] = p.label
   }
+  const disabled = source.kind === 'disabled'
+  const activeFilters = (applied.conversation_id ? 1 : 0) + (applied.chat_session_id ? 1 : 0)
+  const subscriptions = state.status === 'ready' ? state.data.subscriptions : []
+  const togglePanel = name => setPanel(p => (p === name ? null : name))
 
-  const filterBar = jsxs('form', {
-    className: 'grid gap-1.5 border-b border-(--ui-stroke-secondary) px-3 py-2',
+  const toolbar = jsxs('div', {
+    className: 'flex min-w-0 flex-wrap items-center gap-1.5 border-b px-3 pb-2 ' + rule,
+    'data-slot': 'exchange-toolbar',
+    children: [
+      profiles && profiles.status === 'ready'
+        ? jsx(ProfilePicker, { profiles: profiles.data, selected, onSelect: selectProfile })
+        : null,
+      jsxs('div', {
+        className: 'flex shrink-0 items-center gap-1',
+        children: [
+          jsx(Toggle, {
+            open: panel === 'filters',
+            onToggle: () => togglePanel('filters'),
+            controls: 'bx-filters',
+            label: 'Filters',
+            extra: activeFilters ? jsx(Badge, { variant: 'default', children: String(activeFilters) }) : null,
+            disabled,
+            slot: 'exchange-filters-toggle'
+          }),
+          subscriptions.length
+            ? jsx(Toggle, {
+                open: panel === 'subscriptions',
+                onToggle: () => togglePanel('subscriptions'),
+                controls: 'bx-subscriptions',
+                label: 'Subscriptions',
+                extra: jsx('span', { className: muted, children: String(subscriptions.length) }),
+                slot: 'exchange-subscriptions-toggle'
+              })
+            : null
+        ]
+      })
+    ]
+  })
+
+  const filterPanel = jsxs('form', {
+    id: 'bx-filters',
+    className: 'grid gap-1.5 border-b px-3 py-2 ' + rule,
     'data-slot': 'exchange-filters',
     onSubmit: event => {
       event.preventDefault()
@@ -445,32 +673,34 @@ export function ExchangePane({ source }) {
         'aria-label': 'Conversation ID',
         placeholder: 'Conversation ID',
         value: draft.conversation_id,
-        disabled: source.kind === 'disabled',
+        disabled,
         onChange: event => setDraft({ ...draft, conversation_id: event.target.value.trim() })
       }),
       jsx(Input, {
         'aria-label': 'Chat session ID',
         placeholder: 'Chat session ID',
         value: draft.chat_session_id,
-        disabled: source.kind === 'disabled',
+        disabled,
         onChange: event => setDraft({ ...draft, chat_session_id: event.target.value.trim() })
       }),
       jsxs('div', {
         className: 'flex items-center gap-1.5',
         children: [
-          jsx(Button, { type: 'submit', size: 'sm', disabled: source.kind === 'disabled', children: 'Filter' }),
-          jsx(Button, {
-            type: 'button',
-            size: 'sm',
-            variant: 'ghost',
-            disabled: source.kind === 'disabled',
-            onClick: () => setNonce(n => n + 1),
-            children: 'Refresh'
-          })
+          jsx(Button, { type: 'submit', size: 'sm', disabled, children: 'Filter' }),
+          jsx(Button, { type: 'button', size: 'sm', variant: 'ghost', disabled, onClick: clear, children: 'Clear' })
         ]
       }),
-      invalid ? jsx('div', { className: 'text-[0.6875rem] text-destructive', role: 'alert', children: invalid }) : null
+      invalid ? jsx('div', { className: caption + ' text-destructive', role: 'alert', children: invalid }) : null
     ]
+  })
+
+  const subscriptionPanel = jsx('div', {
+    id: 'bx-subscriptions',
+    className: 'grid gap-1 border-b px-3 py-2 ' + rule,
+    'data-slot': 'exchange-subscriptions',
+    children: subscriptions.map(sub =>
+      jsx(SubscriptionLine, { sub, label: labels[sub.profile] || sub.profile }, sub.profile + ':' + sub.sub_id + ':' + sub.generation)
+    )
   })
 
   let body
@@ -491,7 +721,13 @@ export function ExchangePane({ source }) {
       className: 'p-4',
       title: 'Could not load exchanges',
       description: String((state.error && state.error.message) || 'Unknown error'),
-      children: jsx(Button, { size: 'sm', variant: 'outline', onClick: () => setNonce(n => n + 1), children: 'Retry' })
+      // ErrorState lays children out in a grid, which stretched the button across the whole
+      // pane in the real Desktop; keep it at its natural width, centered under the message.
+      children: jsx('div', {
+        className: 'flex justify-center',
+        'data-slot': 'exchange-retry',
+        children: jsx(Button, { size: 'sm', variant: 'outline', onClick: () => setNonce(n => n + 1), children: 'Retry' })
+      })
     })
   } else if (!state.data.exchanges.length) {
     const filtered = applied.conversation_id || applied.chat_session_id
@@ -513,18 +749,12 @@ export function ExchangePane({ source }) {
     const page = state.data.page
     const overview = state.data.selection.profile === OVERVIEW
     body = jsxs('div', {
-      className: 'grid',
+      className: 'grid min-w-0',
       children: [
         jsx(ProfileStatus, { data: state.data }),
-        jsx('div', {
-          className: 'grid gap-1 border-b border-(--ui-stroke-secondary) px-3 py-2',
-          children: state.data.subscriptions.map(sub =>
-            jsx(SubscriptionLine, { sub, label: labels[sub.profile] || sub.profile }, sub.profile + ':' + sub.sub_id + ':' + sub.generation)
-          )
-        }),
-        ...state.data.exchanges.map(exchange => jsx(Exchange, { exchange, labels }, exchange.item_key)),
+        ...state.data.exchanges.map(exchange => jsx(Exchange, { exchange, labels, overview }, exchange.item_key)),
         jsxs('div', {
-          className: 'flex items-center justify-between gap-2 px-3 py-2 text-[0.6875rem] ' + muted,
+          className: 'flex flex-wrap items-center justify-between gap-2 px-3 py-2 ' + caption + ' ' + muted,
           children: [
             jsx('span', {
               children: overview
@@ -542,29 +772,58 @@ export function ExchangePane({ source }) {
             })
           ]
         }),
-        jsx('ul', {
-          className: 'grid gap-0.5 px-3 pb-3 text-[0.6875rem] ' + muted,
-          'data-slot': 'exchange-evidence-limits',
-          children: state.data.evidence_limits.map(item => jsx('li', { children: item }, item))
+        jsxs('div', {
+          className: 'grid gap-1 px-3 pb-3',
+          children: [
+            jsx('div', {
+              className: 'flex',
+              children: jsx(Toggle, {
+                open: aboutOpen,
+                onToggle: () => setAboutOpen(v => !v),
+                controls: 'bx-evidence',
+                label: 'What these states mean',
+                slot: 'exchange-evidence-toggle'
+              })
+            }),
+            aboutOpen
+              ? jsx('ul', {
+                  id: 'bx-evidence',
+                  className: 'grid list-disc gap-0.5 pl-4 ' + caption + ' ' + muted,
+                  'data-slot': 'exchange-evidence-limits',
+                  children: state.data.evidence_limits.map(item => jsx('li', { children: item }, item))
+                })
+              : null
+          ]
         })
       ]
     })
   }
 
   return jsxs('section', {
-    className: 'flex h-full min-h-0 flex-col overflow-y-auto text-sm',
+    className: 'flex h-full min-h-0 min-w-0 flex-col overflow-y-auto text-sm',
     'data-slot': 'bounded-exchanges',
     'aria-label': 'Bounded Events exchanges (read-only)',
     children: [
-      jsx('header', {
-        className: 'px-3 pt-2.5 pb-1 text-xs font-medium text-(--ui-text-secondary)',
-        children: 'Exchanges · read-only'
+      jsxs('header', {
+        className: 'flex items-center gap-2 px-3 pt-2.5 pb-2',
+        children: [
+          jsx('span', { className: 'text-xs font-medium text-(--ui-text-secondary)', children: 'Exchanges' }),
+          jsx(Badge, { variant: 'outline', children: 'read-only' }),
+          jsx('span', { className: 'flex-1' }),
+          jsx(Button, {
+            type: 'button',
+            size: 'xs',
+            variant: 'ghost',
+            disabled,
+            onClick: () => setNonce(n => n + 1),
+            children: 'Refresh'
+          })
+        ]
       }),
       jsx(SourceBanner, { source }),
-      profiles && profiles.status === 'ready'
-        ? jsx(ProfilePicker, { profiles: profiles.data, selected, onSelect: selectProfile })
-        : null,
-      filterBar,
+      toolbar,
+      panel === 'filters' ? filterPanel : null,
+      panel === 'subscriptions' && subscriptions.length ? subscriptionPanel : null,
       body
     ]
   })

@@ -79,8 +79,28 @@ hash-verified in the built package. This folder holds only the pane.
   `@hermes/plugin-sdk`, `react` and `react/jsx-runtime`, and uses `jsx()`/`jsxs()`. Its only
   I/O is `ctx.rest` to its own namespace: no fetch, file access or `host.request`.
 - SDK surface used: `ctx.rest`, `PANES_AREA`, `PALETTE_AREA`, `host.openWorkspace`
-  (feature-detected, with a `host.notify` fallback), `Badge`, `Button`, `Input`, `Loader`,
-  `EmptyState` and `ErrorState`. Styling uses `var(--ui-*)` theme variables only.
+  (feature-detected, with a `host.notify` fallback), `Badge`, `Button`, `DisclosureCaret`,
+  `Input`, `Loader`, `EmptyState` and `ErrorState`. Styling uses `var(--ui-*)` theme variables
+  only. Desktop's Tailwind build does not scan plugin files, so the pane uses only utility
+  classes the host stylesheet already contains. The two layout values it lacks are inline
+  `style`. A real-Desktop run found no pane class without a CSS rule.
+- Layout: each card shows the inbound message, then the bot reply, indented. Routine routing
+  states form one quiet line. Warnings stay as badges. IDs, subscription, chat session and
+  handoff details sit behind a per-exchange **Details** toggle. Profiles are a native `<select>`,
+  one line for any count. Filters, subscriptions and evidence notes are collapsed toggles.
+- Who talks to whom: each card starts with **source → bot** (for example `Alice's planner →
+  Alpha bot`). A reply reads `Reply · Alpha bot → Alice's planner`.
+  - The name is the operator's configured label for the subscription generation that routed the
+    message (`subscribe --counterpart-name` or `source-attribute` in bounded-events). It is always
+    captioned **Configured source · not authenticated**.
+  - Without configuration the card says **Unknown source** with `unconfigured` (or `routes
+    disagree` / `invalid configuration`). The pane never takes a name from the message payload
+    or from the source scope. The scope appears only in Details.
+  - Details show the configured id and the time the name was set. They also flag a name set
+    after the message arrived: names reflect the current configuration, not an identity recorded
+    at arrival.
+  - Needs a bounded-events backend with configured source attribution. On an older backend,
+    every card shows Unknown source.
 - Data contract: `GET /profiles` → `ExchangeService.profiles()`;
   `GET /exchanges?viewer_profile=…` → `ExchangeService.handle()`
   (`bounded-events.exchange-service` schema 1).

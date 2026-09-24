@@ -33,6 +33,10 @@ export function Loader({ label }) {
   return h('span', { 'data-stub': 'loader', role: 'status', 'aria-label': label })
 }
 
+export function DisclosureCaret({ open, ...props }) {
+  return h('span', { 'data-stub': 'disclosure-caret', 'data-open': String(Boolean(open)), ...props }, open ? 'v' : '>')
+}
+
 export function EmptyState({ title, description }) {
   return h('div', { 'data-stub': 'empty-state' }, h('div', null, title), description ? h('div', null, description) : null)
 }

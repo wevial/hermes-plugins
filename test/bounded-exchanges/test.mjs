@@ -64,6 +64,9 @@ await check('fixture comes from the real multi-profile service on disposable roo
   assert.equal(fixture.gamma.error.reason, 'root_unavailable')
   assert.deepEqual(fixture.all_nope.data.exchanges, [])
   assert.equal(fixture.all_nope.data.complete, false)
+  // Source names come from operator config per root: alpha configured, beta not.
+  const cps = fixture.all.data.exchanges.map(x => [x.profile, x.counterpart.attribution, x.counterpart.display_name])
+  assert(cps.every(([p, a, n]) => (p === 'alpha' ? a === 'configured' && n === "Xavier's planner" : a === 'unconfigured' && n === null)), JSON.stringify(cps))
 })
 
 // ------------------------------------------------------------ loader contract (Node)
@@ -229,6 +232,11 @@ const mount = (kind, fx) =>
         source = fixtureSource(pick)
       } else if (kind === 'wrong-answer') {
         source = fixtureSource(() => fx.beta) // always answers beta, whatever was asked
+      } else if (kind === 'many-profiles') {
+        // Navigation scale only: the real profile list plus five extra labels (never loaded).
+        const extra = ['delta', 'epsilon', 'zeta', 'eta', 'theta'].map(id => ({ id, label: id[0].toUpperCase() + id.slice(1) + ' bot · long profile label' }))
+        source = fixtureSource(pick)
+        source.listProfiles = async () => ({ ...fx.profiles.data, profiles: fx.profiles.data.profiles.concat(extra) })
       }
       globalThis.__root = t.ReactDOMClient.createRoot(el)
       globalThis.__root.render(t.React.createElement(mod.ExchangePane, { source }))
@@ -242,6 +250,13 @@ const waitPending = n => page.waitForFunction(n => globalThis.__pending.length >
 const rows = () => page.locator('[data-slot="exchange"]')
 const rowProfiles = () => page.$$eval('[data-slot="exchange"]', els => els.map(e => e.dataset.profile))
 const pick = name => page.getByRole('button', { name, exact: true })
+// Profiles are a native <select> (one line for any profile count); choose by visible label.
+const profileSelect = () => page.getByLabel('Profile', { exact: true })
+const choose = label => profileSelect().selectOption({ label })
+const openFilters = async () => {
+  const toggle = page.locator('[data-slot="exchange-filters-toggle"]')
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click()
+}
 
 await check('registers one pane and one palette command; disabled pane reads nothing', async () => {
   await mount('registered')
@@ -258,7 +273,9 @@ await check('registers one pane and one palette command; disabled pane reads not
   assert.doesNotMatch(body, /ISOLATED FIXTURE/)
   assert.equal(await page.locator('[data-slot="exchange-profiles"]').count(), 0)
   assert.equal(await page.locator('[data-slot="exchange"]').count(), 0)
-  assert.equal(await page.locator('input[disabled]').count(), 2)
+  // Filters stay collapsed and cannot be opened while nothing is connected.
+  assert.equal(await page.locator('[data-slot="exchange-filters-toggle"]').isDisabled(), true)
+  assert.equal(await page.locator('input').count(), 0)
   // Palette run opens the same (disconnected) view; it never sends or activates anything.
   const calls = await page.evaluate(() => {
     const t = globalThis.__test
@@ -278,7 +295,7 @@ await check('registered pane uses ctx.rest: exact namespace paths, service data,
   const body = await text()
   assert.doesNotMatch(body, /ISOLATED FIXTURE|Not connected/)
   assert.match(body, /Incomplete: 1 profile\(s\) unavailable/)
-  await pick('Alpha bot').click()
+  await choose('Alpha bot')
   await page.waitForFunction(() => globalThis.__restPaths.length === 3)
   assert.equal((await page.evaluate(() => globalThis.__restPaths)).at(-1), '/exchanges?viewer_profile=alpha&limit=20')
   await page.locator('[data-profile="alpha"]').first().waitFor()
@@ -303,7 +320,7 @@ await check('overview: every row labeled by profile, duplicate IDs kept apart, i
   await page.locator('[data-slot="exchange-loading"]').waitFor()
   await waitPending(1)
   assert.deepEqual(await queries(), [{ viewer_profile: 'all', conversation_id: '', chat_session_id: '', cursor: null, limit: 20 }])
-  assert.equal(await pick('All profiles').getAttribute('aria-pressed'), 'true')
+  assert.equal(await profileSelect().inputValue(), 'all')
   await release(0)
   await rows().first().waitFor()
   assert.equal(await rows().count(), 4)
@@ -319,7 +336,12 @@ await check('overview: every row labeled by profile, duplicate IDs kept apart, i
   assert.match(body, /Chat delivery unknown/)
   assert.match(body, /Reply published/)
   assert.match(body, /Reader receipt unknown/)
-  assert.match(body, /is not a receipt/)
+  // Publication and receipt stay separate facts on every reply, not only in the footnote.
+  const receipts = await page.locator('[data-slot="exchange-reply"] [data-slot="exchange-receipt"]').allTextContents()
+  assert(receipts.length > 0 && receipts.every(t => t === 'Reader receipt unknown'), receipts.join('|'))
+  assert.equal(await page.locator('[data-slot="exchange-evidence-limits"]').count(), 0)
+  await page.locator('[data-slot="exchange-evidence-toggle"]').click()
+  assert.match(await text(), /is not a receipt/)
   assert.doesNotMatch(body, /\breceived\b|\bdelivered\b|\bread by\b/i)
 })
 
@@ -334,12 +356,108 @@ await check('untrusted message text renders inert and visible', async () => {
   assert.equal(await replyText.textContent(), 'Build is green.\nTwo flaky tests.')
 })
 
+await check('conversation first: direction/sender visible, technical details collapsed and keyboard-toggled', async () => {
+  const row = page.locator('[data-exchange-id="agent-x/m1/v1"][data-profile="alpha"]')
+  assert.equal(await row.locator('[data-slot="exchange-inbound"]').count(), 1)
+  assert.equal(await row.locator('[data-slot="exchange-reply"]').count(), 1)
+  const head = await row.innerText()
+  assert.equal(await row.locator('[data-slot="exchange-direction"]').innerText(), "Xavier's planner → Alpha bot")
+  assert.equal(await row.locator('[data-slot="exchange-source-note"]').innerText(), 'Configured source · not authenticated')
+  assert.match(head, /Inbound/)
+  assert.match(head, /Reply · Alpha bot → Xavier's planner/)
+  assert.doesNotMatch(head, /agent-x\b/) // the scope is a detail, never shown as the sender
+  // Record/subscription/session IDs are not in the default view.
+  assert.equal(await page.locator('[data-slot="exchange-details"]').count(), 0)
+  assert.doesNotMatch(head, /\bg1\b|chat-alpha/)
+  const toggle = row.locator('[data-slot="exchange-details-toggle"]')
+  assert.equal(await toggle.getAttribute('aria-expanded'), 'false')
+  await toggle.focus()
+  await page.keyboard.press('Enter')
+  const details = row.locator('[data-slot="exchange-details"]')
+  await details.waitFor()
+  assert.equal(await toggle.getAttribute('aria-expanded'), 'true')
+  assert.equal(await toggle.getAttribute('aria-controls'), await details.getAttribute('id'))
+  const d = await details.innerText()
+  assert.match(d, /Record\s+m1 v1/)
+  assert.match(d, /Source\s+Xavier's planner \[agent-xavier\] · Configured source · not authenticated/)
+  assert.match(d, /Source named\s+\S/)
+  assert.doesNotMatch(d, /after this message was observed/) // named at subscribe time
+  assert.match(d, /Source scope\s+agent-x \(unauthenticated source\)/)
+  assert.match(d, /Chat delivery\s+Chat delivery unknown/)
+  assert.match(d, /Reply\s+Reply published · Reader receipt unknown/)
+  // Only this exchange opened.
+  assert.equal(await page.locator('[data-slot="exchange-details"]').count(), 1)
+  await page.keyboard.press('Space')
+  await page.waitForFunction(() => !document.querySelector('[data-slot="exchange-details"]'))
+  // Subscriptions are one toggle away, not a permanent strip.
+  assert.equal(await page.locator('[data-slot="exchange-subscription"]').count(), 0)
+  await page.locator('[data-slot="exchange-subscriptions-toggle"]').click()
+  assert(await page.locator('[data-slot="exchange-subscription"]').count() >= 2)
+  await page.locator('[data-slot="exchange-subscriptions-toggle"]').click()
+  assert.equal(await page.locator('[data-slot="exchange-subscription"]').count(), 0)
+})
+
+await check('source attribution: configured name only where configured; same IDs and a claimed sender stay unknown', async () => {
+  // Beta's m1 has the same sub/scope/record IDs as alpha's and a payload claiming to be Xavier.
+  const beta = page.locator('[data-exchange-id="agent-x/m1/v1"][data-profile="beta"]')
+  assert.equal(await beta.locator('[data-slot="exchange-direction"]').innerText(), 'Unknown source → Beta bot')
+  assert.equal(await beta.locator('[data-slot="exchange-direction"]').getAttribute('data-attribution'), 'unconfigured')
+  assert.equal(await beta.locator('[data-slot="exchange-source-note"]').innerText(), 'unconfigured · not authenticated')
+  assert.doesNotMatch(await beta.innerText(), /Xavier|agent-xavier/)
+  await beta.locator('[data-slot="exchange-details-toggle"]').click()
+  const d = await beta.locator('[data-slot="exchange-details"]').innerText()
+  assert.match(d, /Source\s+Unknown source \(unconfigured · not authenticated\)/)
+  assert.doesNotMatch(d, /Xavier|Source named/)
+  await beta.locator('[data-slot="exchange-details-toggle"]').click()
+  // Real-Desktop regression: the reply header must wrap, never truncate, so the source name at its
+  // end stays visible in a narrow pane (the stub page has no Tailwind, so check the classes).
+  const who = page.locator('[data-exchange-id="agent-x/m1/v1"][data-profile="alpha"] [data-slot="exchange-reply"] [data-slot="exchange-bubble-who"]')
+  assert.equal(await who.innerText(), "Reply · Alpha bot → Xavier's planner")
+  const whoClass = await who.getAttribute('class')
+  assert.match(whoClass, /\bbreak-words\b/)
+  assert.doesNotMatch(whoClass, /\btruncate\b/)
+  // Every alpha row names alpha's configured source; no beta row does.
+  const dirs = await page.$$eval('[data-slot="exchange"]', els =>
+    els.map(e => [e.dataset.profile, e.querySelector('[data-slot="exchange-direction"]').textContent]))
+  for (const [p, dir] of dirs) {
+    assert.equal(dir, p === 'alpha' ? "Xavier's planner → Alpha bot" : 'Unknown source → Beta bot')
+  }
+  // Subscriptions list the configured source per profile.
+  await page.locator('[data-slot="exchange-subscriptions-toggle"]').click()
+  const subs = await page.locator('[data-slot="exchange-subscription-source"]').allTextContents()
+  assert.deepEqual(subs.sort(), ["from Unknown source (agent-x)", "from Xavier's planner (agent-x)"].sort())
+  await page.locator('[data-slot="exchange-subscriptions-toggle"]').click()
+  // Unsafe or unexpected values (a tampered/foreign response) never render as a trusted name.
+  const labels = await page.evaluate(() => {
+    const f = globalThis.__plugin.counterpartLabel
+    return [
+      f({ attribution: 'configured', counterpart_id: 'a', display_name: 'Ev\u202eil\u0000' }),
+      f({ attribution: 'configured', counterpart_id: 'a', display_name: null }),
+      f({ attribution: 'conflicting' }),
+      f({ attribution: 'invalid' }),
+      f({ attribution: 'something-new', display_name: 'Mallory' }),
+      f(undefined)
+    ].map(l => [l.configured, l.name, l.note])
+  })
+  assert.deepEqual(labels, [
+    [true, 'Ev\\u{202e}il\\u{0}', 'Configured source · not authenticated'],
+    [false, 'Unknown source', 'unconfigured · not authenticated'],
+    [false, 'Unknown source', 'routes disagree · not authenticated'],
+    [false, 'Unknown source', 'invalid configuration · not authenticated'],
+    [false, 'Unknown source', 'unconfigured · not authenticated'],
+    [false, 'Unknown source', 'unconfigured · not authenticated']
+  ])
+})
+
+// Narrow-pane layout is measured in the real Desktop (theme CSS), not here: this page has no
+// Tailwind stylesheet, so an overflow check against the stub would prove nothing.
+
 await check('switching clears rows at once and a late answer for an old selection is dropped', async () => {
-  await pick('Beta bot').click()
+  await choose('Beta bot')
   await page.locator('[data-slot="exchange-loading"]').waitFor()
   assert.equal(await rows().count(), 0) // no overview rows left under the beta selection
   await waitPending(2)
-  await pick('Alpha bot').click()
+  await choose('Alpha bot')
   await waitPending(3)
   await release(1) // beta answers late, after the user moved on
   await page.waitForTimeout(100)
@@ -359,7 +477,7 @@ await check('cursor stays with its profile: Older pages alpha, switching resets 
   await release(3)
   await page.locator('[data-exchange-id="agent-x/m1/v1"][data-profile="alpha"]').waitFor()
   assert.deepEqual(await rowProfiles(), ['alpha'])
-  await pick('All profiles').click()
+  await choose('All profiles')
   await waitPending(5)
   const last = (await queries()).at(-1)
   assert.deepEqual([last.viewer_profile, last.cursor], ['all', null])
@@ -369,6 +487,7 @@ await check('cursor stays with its profile: Older pages alpha, switching resets 
 
 await check('filters: invalid refused inline; empty overview with an unavailable profile is not a false empty', async () => {
   const before = (await queries()).length
+  await openFilters()
   await page.getByLabel('Conversation ID').fill('bad id!')
   await pick('Filter').click()
   await page.getByRole('alert').waitFor()
@@ -382,7 +501,7 @@ await check('filters: invalid refused inline; empty overview with an unavailable
   assert.match(body, /No exchanges from available profiles/)
   assert.match(body, /not a complete answer/)
   assert.doesNotMatch(body, /Nothing matches these filters/)
-  await pick('Alpha bot').click()
+  await choose('Alpha bot')
   await waitPending(7)
   assert.equal((await queries()).at(-1).conversation_id, 'nope')
   await release(6)
@@ -390,7 +509,7 @@ await check('filters: invalid refused inline; empty overview with an unavailable
 })
 
 await check('an unavailable profile shows an error, never an empty list', async () => {
-  await pick('Gamma bot').click()
+  await choose('Gamma bot')
   await waitPending(8)
   await release(7)
   await page.locator('[data-stub="error-state"]').waitFor()
@@ -399,6 +518,11 @@ await check('an unavailable profile shows an error, never an empty list', async 
   assert.match(body, /configured root is missing/)
   assert.equal(await rows().count(), 0)
   assert.equal(await page.locator('[data-stub="empty-state"]').count(), 0)
+  // Real-Desktop layout regression: Retry must sit in its own centering wrapper, not be a
+  // direct grid child of ErrorState (which stretched it full width in the gui-lab capture).
+  const retryWrap = page.locator('[data-slot="exchange-retry"]')
+  assert.match(await retryWrap.getAttribute('class'), /\bflex\b.*\bjustify-center\b/)
+  assert.equal(await retryWrap.getByRole('button', { name: 'Retry' }).count(), 1)
   await pick('Retry').click()
   await waitPending(9)
 })
@@ -410,6 +534,22 @@ await check('a response for a different selection is refused, not displayed', as
   await page.locator('[data-stub="error-state"]').waitFor()
   assert.match(await text(), /answered a different selection; nothing shown/)
   assert.equal(await rows().count(), 0)
+})
+
+await check('eight profiles: navigation stays one compact control', async () => {
+  await mount('many-profiles', fixture)
+  await waitPending(1)
+  const labels = await profileSelect().locator('option').allTextContents()
+  assert.equal(labels.length, 9) // All profiles + 3 real + 5 extra
+  assert.equal(labels[0], 'All profiles')
+  await page.setViewportSize({ width: 320, height: 800 })
+  const h = await page.locator('[data-slot="exchange-toolbar"]').evaluate(el => el.getBoundingClientRect().height)
+  assert(h < 48, 'toolbar height ' + h)
+  await profileSelect().focus()
+  await page.keyboard.press('ArrowDown') // native select: keyboard changes the profile
+  await waitPending(2)
+  assert.equal((await queries()).at(-1).viewer_profile, 'alpha')
+  await page.setViewportSize({ width: 1280, height: 720 })
 })
 
 await browser.close()

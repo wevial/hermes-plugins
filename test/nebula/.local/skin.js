@@ -1,11 +1,10 @@
-// Cosmos Skin — station wallpaper, lavender glow rims and a pixel wordmark for
+// Cosmos Skin — station wallpaper, lavender glow rims and a glowing wordmark for
 // the Cosmos theme. © 2026 Ko Vial, MIT. Silkscreen font © The Silkscreen
 // Project Authors, SIL OFL 1.1 (assets/OFL-Silkscreen.txt).
 import { PALETTE_AREA, host } from 'data:text/javascript;base64,ZXhwb3J0IGNvbnN0IFRIRU1FU19BUkVBPSd0aGVtZXMnOyBleHBvcnQgY29uc3QgUEFMRVRURV9BUkVBPSJwYWxldHRlIjsgZXhwb3J0IGNvbnN0IGhvc3Q9e25vdGlmeTpuPT5nbG9iYWxUaGlzLm5vdGlmaWNhdGlvbnMucHVzaChuKX07'
 
 const WALLPAPER_FILE = 'nebula-station.webp'
 const SPACE_FILE = 'cosmos-space.webp'
-const FONT_FILE = 'silkscreen.woff2'
 const SPARKLE_FILE = 'sparkle.png'
 
 // Everything is scoped to the Cosmos theme so enabling the skin on another
@@ -13,8 +12,7 @@ const SPARKLE_FILE = 'sparkle.png'
 // body fonts are preserved; only paint changes. Overlays that must sit above
 // opaque pane children are pointer-transparent ::after rims (same approach as
 // Retroma Tactile) so geometry and scrolling are untouched.
-export const skinCss = ({ wallpaper, font, sparkle }) => `
-${font ? `@font-face { font-family: 'Nebula Pixel'; src: url(${font}) format('woff2'); font-display: swap; }` : ''}
+export const skinCss = ({ wallpaper, sparkle }) => `
 :root[data-hermes-theme="nebula"] {
   --nebula-rim: var(--dt-border);
   --nebula-glow: 0 0 10px color-mix(in srgb, var(--nebula-lavender) 35%, transparent);
@@ -177,14 +175,11 @@ ${sparkle ? `
 :root[data-hermes-theme="nebula"] [data-slot="code-card"] {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 60%, transparent);
 }
-/* The empty-chat wordmark in the pixel face; body text is untouched. */
-${font ? `
+/* Preserve native wordmark typography; only its color and glow are themed. */
 :root[data-hermes-theme="nebula"] .wordmark {
-  font-family: 'Nebula Pixel', var(--dt-font-sans, sans-serif);
-  letter-spacing: 0.12em;
   color: var(--nebula-lavender);
   text-shadow: 0 0 12px color-mix(in srgb, var(--nebula-lavender) 60%, transparent);
-}` : ''}
+}
 /* Scrollbar thumb in lavender rather than the foreground-derived grey. */
 :root[data-hermes-theme="nebula"] {
   --dt-scrollbar-thumb: var(--nebula-lavender);
@@ -201,7 +196,7 @@ async function loadAsset(file) {
 
 export default {
   id: 'nebula-skin', name: 'Cosmos Skin', defaultEnabled: false,
-  description: 'Optional station wallpaper, lavender glow rims and pixel wordmark for the Cosmos theme. Remembers your palette command choice.',
+  description: 'Optional station wallpaper, lavender glow rims and glowing wordmark for the Cosmos theme. Remembers your palette command choice.',
   register(ctx) {
     let style = null
     let disposed = false
@@ -215,8 +210,8 @@ export default {
     const removeStyle = () => { style?.remove(); style = null }
     const loadAssets = async () => {
       if (assets) return assets
-      const [wallpaper, space, font, sparkle] = await Promise.all([loadAsset(WALLPAPER_FILE), loadAsset(SPACE_FILE), loadAsset(FONT_FILE), loadAsset(SPARKLE_FILE)].map(p => p.catch(() => null)))
-      assets = { wallpaper, space, font, sparkle }
+      const [wallpaper, space, sparkle] = await Promise.all([loadAsset(WALLPAPER_FILE), loadAsset(SPACE_FILE), loadAsset(SPARKLE_FILE)].map(p => p.catch(() => null)))
+      assets = { wallpaper, space, sparkle }
       if (!wallpaper && !disposed) host.notify({ kind: 'error', message: 'Cosmos wallpaper could not be read; the skin is on without it. Is assets/nebula-station.webp installed?' })
       return assets
     }

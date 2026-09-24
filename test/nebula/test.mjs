@@ -156,10 +156,11 @@ try {
     }
   })
   const metrics = () => page.evaluate(() => Object.fromEntries(['action', 'input', 'panel', 'composer', 'code', 'nav-artifacts', 'sidebar', 'sessions-well', 'wordmark'].map(id => { const e = document.getElementById(id), r = e.getBoundingClientRect(), s = getComputedStyle(e); return [id, [r.x, r.y, r.width, r.height, s.fontFamily === s.fontFamily && id !== 'wordmark' ? s.fontFamily : 'wordmark', s.fontSize, s.padding]] })))
-  for (const mode of ['light', 'dark']) await check(`${mode}: skin paints wallpaper, veils, rims and pixel wordmark without moving anything`, async () => {
+  for (const mode of ['light', 'dark']) await check(`${mode}: skin paints wallpaper, veils, rims and native wordmark without moving anything`, async () => {
     await page.evaluate(m => { selectMode(m); run('disable') }, mode); await waitSkin(false); await settle()
     assert.equal(await page.evaluate(() => document.documentElement.dataset.hermesTheme), 'nebula')
     const before = await metrics()
+    const originalWordmark = await page.locator('#wordmark').evaluate(e => { const s = getComputedStyle(e); return [s.fontFamily, s.letterSpacing] })
     const alpha = c => { const m = c.match(/\/\s*([\d.]+)\)$/) || c.match(/^rgba\(.*,\s*([\d.]+)\)$/); return m ? Number(m[1]) : 1 }
     const shellBefore = await page.locator('#shell').evaluate(e => getComputedStyle(e).backgroundImage)
     assert.equal(shellBefore, 'none')
@@ -269,9 +270,7 @@ try {
     const navBg = await page.evaluate(async b => { const img = new Image(); img.src = 'data:image/png;base64,' + b; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); return [...x.getImageData(2, 2, 1, 1).data].slice(0, 3) }, navPng.toString('base64'))
     const navFg = await page.locator('#nav-artifacts').evaluate(e => getComputedStyle(e).color.match(/\d+/g).slice(0, 3).map(Number))
     assert(ratio(navBg, navFg) >= 4.5, `${mode} nav label ${ratio(navBg, navFg).toFixed(2)} fg=${navFg} bg=${navBg}`)
-    const wm = await page.locator('#wordmark').evaluate(e => getComputedStyle(e).fontFamily)
-    assert.match(wm, /Nebula Pixel/)
-    assert(await page.evaluate(() => document.fonts.check("40px 'Nebula Pixel'")), 'pixel font loaded from woff2')
+    assert.deepEqual(await page.locator('#wordmark').evaluate(e => { const s = getComputedStyle(e); return [s.fontFamily, s.letterSpacing] }), originalWordmark, 'wordmark retains native typography')
     // Real text over the veiled content still clears AA. Sample the panel prose
     // against a screenshot of what is actually behind it.
     const png = await page.locator('#heading').screenshot()

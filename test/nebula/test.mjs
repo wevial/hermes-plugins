@@ -270,6 +270,10 @@ try {
     assert(inks.every(i => i[2] === '10px'), 'nav chips rounded 10px')
     const rowRadius = await page.locator('#sessions-well [data-slot="row-button"]').first().evaluate(e => getComputedStyle(e).borderRadius)
     assert.equal(rowRadius, '8px', 'session rows rounded')
+    const sessionHover = page.locator('#sessions-well [data-slot="row-button"]').first()
+    await sessionHover.hover(); await settle()
+    assert.equal(await sessionHover.evaluate(e => getComputedStyle(e).boxShadow), 'none', 'session hover has no decorative border')
+    await page.mouse.move(0, 0); await settle()
     const widget = await page.locator('#changed-files').evaluate(e => getComputedStyle(e).backgroundColor)
     assert(alpha(widget) > 0.3 && alpha(widget) < 0.8, 'files-changed widget is veiled, not opaque: ' + widget)
     // Nav row label text still clears AA on its chip fill in this mode.

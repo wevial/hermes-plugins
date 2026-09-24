@@ -139,15 +139,9 @@ ${wallpaper ? `
   background-color: var(--theme-accent-soft);
   box-shadow: 0 0 12px color-mix(in srgb, var(--nebula-row-ink, var(--nebula-lavender)) 50%, transparent);
 }
-/* Session rows: rounded like Retroma; hover and the active row get a rim. */
+/* Session rows keep soft corners; native fills/focus provide state feedback. */
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-slot="row-button"] {
   border-radius: 8px;
-}
-:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-slot="row-button"]:hover {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 40%, transparent);
-}
-:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-slot="row-button"][class~="bg-(--ui-row-active-background)"] {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 60%, transparent), var(--nebula-glow);
 }
 /* Section caption glyph: the native 8px dithered square becomes the sparkle,
    painted by an overlay so the caption's geometry is unchanged. */

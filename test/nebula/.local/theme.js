@@ -1,12 +1,12 @@
 // Nebula — a deep-indigo space palette for Hermes Desktop. © 2026 Ko Vial, MIT.
-// Palette + color-only bridges. Wallpaper, glow rims and the pixel wordmark
+// Palette + color-only bridges. Wallpaper, bevelled rims and the pixel wordmark
 // live in the separate, opt-in `nebula-skin` plugin.
 import { THEMES_AREA } from 'data:text/javascript;base64,ZXhwb3J0IGNvbnN0IFRIRU1FU19BUkVBPSd0aGVtZXMnOyBleHBvcnQgY29uc3QgUEFMRVRURV9BUkVBPSJwYWxldHRlIjsgZXhwb3J0IGNvbnN0IGhvc3Q9e25vdGlmeTpuPT5nbG9iYWxUaGlzLm5vdGlmaWNhdGlvbnMucHVzaChuKX07'
 
 export const theme = {
   name: 'nebula',
   label: 'Nebula',
-  description: 'Deep indigo field, lavender rims, cyan and gold accents. Pairs with the optional Nebula Skin for the wallpaper and glow.',
+  description: 'Deep indigo field, lavender rims, cyan and gold accents. Pairs with the optional Nebula Skin for the wallpaper and bevels.',
   colors: {
     background: '#e6e3ff', foreground: '#24215a',
     card: '#efecff', cardForeground: '#24215a',
@@ -21,19 +21,22 @@ export const theme = {
     sidebarBackground: '#dbd7ff', sidebarBorder: '#8a86f0',
     userBubble: '#d8d3ff', userBubbleBorder: '#9b96ff'
   },
+  // Dark roles, exact: app #050816, main panel #0B1026, elevated #11183A,
+  // sidebar #151B46, input/card #1B2252, borders #705CFF / #3E55D9, text
+  // #F4F1FF / #B8B4D9 / #7E82AE, accent #8D63FF, purple #B35CFF, error #FF6584.
   darkColors: {
-    background: '#0b0b2c', foreground: '#f2f0ff',
-    card: '#12123a', cardForeground: '#f2f0ff',
-    muted: '#25246a', mutedForeground: '#a6a1e6',
-    popover: '#1a1852', popoverForeground: '#f2f0ff',
-    primary: '#5ecbff', primaryForeground: '#0b0b2c',
-    secondary: '#25246a', secondaryForeground: '#f2f0ff',
-    accent: '#2b2a72', accentForeground: '#f2f0ff',
-    border: '#8a86f0', input: '#8a86f0', ring: '#5ecbff',
-    midground: '#b8b3ff', midgroundForeground: '#0b0b2c', composerRing: '#9d9aff',
-    destructive: '#ff6b7a', destructiveForeground: '#2a0d12',
-    sidebarBackground: '#12123a', sidebarBorder: '#8a86f0',
-    userBubble: '#363377', userBubbleBorder: '#9b96ff'
+    background: '#050816', foreground: '#f4f1ff',
+    card: '#0b1026', cardForeground: '#f4f1ff',
+    muted: '#1b2252', mutedForeground: '#b8b4d9',
+    popover: '#11183a', popoverForeground: '#f4f1ff',
+    primary: '#8d63ff', primaryForeground: '#050816',
+    secondary: '#1b2252', secondaryForeground: '#f4f1ff',
+    accent: '#1b2252', accentForeground: '#f4f1ff',
+    border: '#705cff', input: '#705cff', ring: '#8d63ff',
+    midground: '#b35cff', midgroundForeground: '#050816', composerRing: '#8d63ff',
+    destructive: '#ff6584', destructiveForeground: '#050816',
+    sidebarBackground: '#151b46', sidebarBorder: '#3e55d9',
+    userBubble: '#1b2252', userBubbleBorder: '#705cff'
   }
 }
 
@@ -64,11 +67,21 @@ export const colorCss = `
   --dt-popover: rgb(from var(--theme-elevated-seed) r g b / 1);
 }
 :root[data-hermes-theme="nebula"][data-hermes-mode="dark"] {
-  --nebula-cyan: #5ecbff;
-  --nebula-gold: #f5c542;
-  --nebula-lavender: #b8b3ff;
-  --nebula-meta: #a6a1e6;
-  --nebula-placeholder: #8c88c9;
+  --nebula-cyan: #47d9ff;
+  --nebula-gold: #ffd86a;
+  --nebula-lavender: #b35cff;
+  --nebula-accent: #8d63ff;
+  --nebula-magenta: #f05cff;
+  --nebula-blue: #497bff;
+  --nebula-warm: #ffb878;
+  --nebula-meta: #b8b4d9;
+  --nebula-placeholder: #7e82ae;
+  --ui-text-quaternary: #7e82ae;
+  --ui-stroke-secondary: #3e55d9;
+  --ui-bg-input: #1b2252;
+  --ui-success: #52e6b4 !important; /* applyTheme writes a harmonized green inline */
+  --ui-warning: #ffc857;
+  --ui-danger: #ff6584;
 }
 /* Sidebar captions (PINNED / SESSIONS / date dividers) in lavender rather
    than the cyan primary the host hard-codes for them. */
@@ -83,8 +96,8 @@ export const colorCss = `
   --nebula-ink-5: #2a5fc0; --nebula-ink-6: #5a3fc0; --nebula-ink-7: #3b52b5;
 }
 :root[data-hermes-theme="nebula"][data-hermes-mode="dark"] {
-  --nebula-ink-1: #ff7ac0; --nebula-ink-2: #5fe0ff; --nebula-ink-3: #f5d36a; --nebula-ink-4: #7af0b8;
-  --nebula-ink-5: #7fb2ff; --nebula-ink-6: #c9b4ff; --nebula-ink-7: #b8c6ff;
+  --nebula-ink-1: #f05cff; --nebula-ink-2: #47d9ff; --nebula-ink-3: #ffd86a; --nebula-ink-4: #52e6b4;
+  --nebula-ink-5: #497bff; --nebula-ink-6: #b35cff; --nebula-ink-7: #ffb878;
 }
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] li[data-sidebar="menu-item"]:nth-child(7n+1):has([data-tour^="sidebar-nav-"]) { --nebula-row-ink: var(--nebula-ink-1); }
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] li[data-sidebar="menu-item"]:nth-child(7n+2):has([data-tour^="sidebar-nav-"]) { --nebula-row-ink: var(--nebula-ink-2); }
@@ -109,6 +122,9 @@ export const colorCss = `
 :root[data-hermes-theme="nebula"] [data-slot="composer-root"] {
   --composer-fill: var(--theme-card-seed);
 }
+:root[data-hermes-theme="nebula"][data-hermes-mode="dark"] [data-slot="composer-root"] {
+  --composer-fill: var(--ui-bg-input);
+}
 :root[data-hermes-theme="nebula"] [data-slot="aui_assistant-message-content"] .aui-md :is(h1,h2,h3,h4,h5,h6) {
   color: var(--nebula-lavender);
 }
@@ -122,7 +138,7 @@ export const colorCss = `
 
 export default {
   id: 'nebula-theme', name: 'Nebula Theme',
-  description: 'Registers the Nebula palette without selecting it. Wallpaper and glow are the separate Nebula Skin plugin.',
+  description: 'Registers the Nebula palette without selecting it. Wallpaper and bevels are the separate Nebula Skin plugin.',
   register(ctx) {
     ctx.register({ id: 'palette', area: THEMES_AREA, data: theme })
     const style = document.createElement('style')

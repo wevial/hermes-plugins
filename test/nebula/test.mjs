@@ -33,6 +33,22 @@ assert(isValidTheme(themeModule.theme))
 const required = [...(await read('themes/types.ts')).split('export interface DesktopThemeColors {')[1].split('\n}')[0].matchAll(/^  (\w+): string/gm)].map(m => m[1])
 for (const colors of [themeModule.theme.colors, themeModule.theme.darkColors]) for (const key of required) assert.match(colors[key], /^#[\da-f]{6}$/i, key)
 assert.equal(themeModule.theme.typography, undefined, 'palette plugin must not change fonts')
+// User-specified dark roles map exactly; the light palette is unchanged.
+const lower = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v.toLowerCase()]))
+assert.deepEqual(lower(themeModule.theme.darkColors), {
+  background: '#050816', foreground: '#f4f1ff', card: '#0b1026', cardForeground: '#f4f1ff', muted: '#1b2252', mutedForeground: '#b8b4d9',
+  popover: '#11183a', popoverForeground: '#f4f1ff', primary: '#8d63ff', primaryForeground: '#050816', secondary: '#1b2252', secondaryForeground: '#f4f1ff',
+  accent: '#1b2252', accentForeground: '#f4f1ff', border: '#705cff', input: '#705cff', ring: '#8d63ff', midground: '#b35cff', midgroundForeground: '#050816',
+  composerRing: '#8d63ff', destructive: '#ff6584', destructiveForeground: '#050816', sidebarBackground: '#151b46', sidebarBorder: '#3e55d9',
+  userBubble: '#1b2252', userBubbleBorder: '#705cff'
+})
+assert.deepEqual(themeModule.theme.colors, {
+  background: '#e6e3ff', foreground: '#24215a', card: '#efecff', cardForeground: '#24215a', muted: '#d3cffa', mutedForeground: '#56528f',
+  popover: '#f7f5ff', popoverForeground: '#24215a', primary: '#2a6fc0', primaryForeground: '#ffffff', secondary: '#d9d5fb', secondaryForeground: '#24215a',
+  accent: '#cfc9ff', accentForeground: '#24215a', border: '#8a86f0', input: '#8a86f0', ring: '#2a6fc0', midground: '#5c55d6', midgroundForeground: '#ffffff',
+  composerRing: '#7b74ef', destructive: '#c43d4e', destructiveForeground: '#ffffff', sidebarBackground: '#dbd7ff', sidebarBorder: '#8a86f0',
+  userBubble: '#d8d3ff', userBubbleBorder: '#9b96ff'
+}, 'light palette preserved')
 // Selector anchors the skin depends on, checked against the installed source.
 for (const [file, anchors] of [
   ['app/contrib/controller.tsx', ['data-contrib-shell=""']],
@@ -118,6 +134,8 @@ async function check(name, fn) { await fn(); console.log('PASS', name) }
 const lum = c => c.map(v => { v /= 255; return v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4 }).reduce((a, v, i) => a + v * [.2126, .7152, .0722][i], 0)
 const ratio = (a, b) => (Math.max(lum(a), lum(b)) + .05) / (Math.min(lum(a), lum(b)) + .05)
 const hex = h => h.slice(1).match(/../g).map(v => parseInt(v, 16))
+// Computed box-shadow/text-shadow -> per-layer [x, y, blur] (commas inside rgb() kept).
+const shadowLayers = v => v === 'none' ? [] : v.split(/,(?![^(]*\))/).map(l => [...l.replace(/\w+\([^)]*\)/g, '').matchAll(/(-?[\d.]+)px/g)].map(m => Number(m[1])))
 try {
   await page.goto(`http://127.0.0.1:${server.address().port}/`)
   await page.waitForFunction(() => window.ready)
@@ -151,6 +169,24 @@ try {
     for (const id of ['sidebar', 'pane-body', 'composer-surface']) {
       const rim = await page.locator('#' + id).evaluate(e => { const s = getComputedStyle(e, '::after'); return [s.content, s.pointerEvents, s.boxShadow] })
       assert.notEqual(rim[0], 'none', id); assert.equal(rim[1], 'none'); assert.notEqual(rim[2], 'none')
+      // Crisp directional bevel: a 2px top-left and a 2px bottom-right layer.
+      const layers = shadowLayers(rim[2])
+      assert(layers.some(l => l[0] === 2 && l[1] === 2) && layers.some(l => l[0] === -2 && l[1] === -2), `${id} rim is a directional bevel: ${rim[2]}`)
+    }
+    // No broad glow anywhere the skin paints a rim: every shadow layer has 0 blur.
+    const painted = await page.evaluate(() => {
+      const out = []
+      for (const [sel, pseudo] of [['#sidebar', '::after'], ['#pane-body', '::after'], ['#composer-surface', '::after'], ['#composer-surface', null], ['#sessions-well', null],
+        ['[data-tour="sessions-sidebar"] [data-sidebar="menu-button"]', null], ['[data-slot="row-button"]', null], ['.composer-human-message', null], ['#wordmark', null]])
+        for (const e of document.querySelectorAll(sel)) { const s = getComputedStyle(e, pseudo); out.push([sel + (pseudo || ''), s.boxShadow, s.textShadow]) }
+      return out
+    })
+    assert(painted.length >= 10, 'rimmed elements found')
+    for (const [sel, box, text] of painted) for (const l of [...shadowLayers(box), ...shadowLayers(text)]) assert.equal(l[2], 0, `${mode} ${sel} has a blurred shadow: ${box} / ${text}`)
+    if (mode === 'dark') {
+      // Exact role mapping reaches the rendered tokens.
+      const roles = await page.evaluate(() => { const s = getComputedStyle(document.documentElement); return Object.fromEntries(['--nebula-cyan', '--nebula-gold', '--nebula-lavender', '--nebula-accent', '--nebula-magenta', '--nebula-blue', '--nebula-warm', '--nebula-meta', '--nebula-placeholder', '--ui-text-quaternary', '--ui-stroke-secondary', '--ui-bg-input', '--ui-success', '--ui-warning', '--ui-danger'].map(k => [k, s.getPropertyValue(k).trim()])) })
+      assert.deepEqual(roles, { '--nebula-cyan': '#47d9ff', '--nebula-gold': '#ffd86a', '--nebula-lavender': '#b35cff', '--nebula-accent': '#8d63ff', '--nebula-magenta': '#f05cff', '--nebula-blue': '#497bff', '--nebula-warm': '#ffb878', '--nebula-meta': '#b8b4d9', '--nebula-placeholder': '#7e82ae', '--ui-text-quaternary': '#7e82ae', '--ui-stroke-secondary': '#3e55d9', '--ui-bg-input': '#1b2252', '--ui-success': '#52e6b4', '--ui-warning': '#ffc857', '--ui-danger': '#ff6584' })
     }
     const veil = await page.locator('#panel').evaluate(e => getComputedStyle(e.querySelector('.pane-layer')).backgroundColor)
     assert(alpha(veil) > 0.3 && alpha(veil) < 0.9, 'content surface is translucent over the wallpaper: ' + veil)

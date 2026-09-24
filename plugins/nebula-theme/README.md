@@ -1,6 +1,6 @@
 # Nebula Theme
 
-A deep-indigo space palette for Hermes Desktop: dark mode is a near-black navy field with lavender rims, cyan and gold accents and lavender meta text; light mode is a tinted lavender interpretation with the same rims and a deeper blue accent. The wallpaper, glow rims and pixel wordmark are the separate, opt-in [Nebula Skin](../nebula-skin/README.md).
+A deep-indigo space palette for Hermes Desktop: dark mode is a deep-space navy field (app `#050816`, panel `#0B1026`, elevated `#11183A`, sidebar `#151B46`, input/card `#1B2252`) with violet `#705CFF` / blue `#3E55D9` borders, a `#8D63FF` accent, purple `#B35CFF` captions and headings, cyan `#47D9FF` links, and `#F4F1FF` / `#B8B4D9` / `#7E82AE` text; nav rows cycle magenta, cyan, gold, green, blue, purple and warm. Success `#52E6B4`, warning `#FFC857` and error `#FF6584` feed the host status tokens. Light mode is a tinted lavender interpretation with a deeper blue accent. The wallpaper, bevelled rims and pixel wordmark are the separate, opt-in [Nebula Skin](../nebula-skin/README.md).
 
 This is a palette contribution plus a small theme-scoped color stylesheet. Registering it does **not** select it. No font overrides, external requests, settings writes or theme-selection requests are made.
 

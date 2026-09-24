@@ -1,4 +1,4 @@
-// Nebula Skin — station wallpaper, lavender glow rims and a pixel wordmark for
+// Nebula Skin — station wallpaper, crisp bevelled rims and a pixel wordmark for
 // the Nebula theme. © 2026 Ko Vial, MIT. Silkscreen font © The Silkscreen
 // Project Authors, SIL OFL 1.1 (assets/OFL-Silkscreen.txt).
 import { PALETTE_AREA, host } from '@hermes/plugin-sdk'
@@ -16,14 +16,20 @@ export const skinCss = ({ wallpaper, font, sparkle }) => `
 ${font ? `@font-face { font-family: 'Nebula Pixel'; src: url(${font}) format('woff2'); font-display: swap; }` : ''}
 :root[data-hermes-theme="nebula"] {
   --nebula-rim: var(--dt-border);
-  --nebula-glow: 0 0 10px color-mix(in srgb, var(--nebula-lavender) 35%, transparent);
-  --nebula-frame: inset 0 0 0 1px var(--nebula-rim);
   --nebula-veil: 0.42;
   --nebula-sidebar-keep: 96%;
+  /* Crisp directional bevels (after Retroma Tactile): zero blur, light from
+     the top-left. Raised chips lift; wells and pane bodies sink. */
+  --nebula-light: color-mix(in srgb, var(--dt-border) 70%, white);
+  --nebula-shade: color-mix(in srgb, var(--theme-background-seed) 70%, black);
+  --nebula-raised: inset 0 0 0 1px var(--nebula-rim), inset 2px 2px 0 var(--nebula-light), inset -2px -2px 0 var(--nebula-shade);
+  --nebula-inset: inset 0 0 0 1px var(--nebula-rim), inset 2px 2px 0 var(--nebula-shade), inset -2px -2px 0 var(--nebula-light);
+  --nebula-hairline: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 60%, transparent);
 }
 :root[data-hermes-theme="nebula"][data-hermes-mode="light"] {
   --nebula-veil: 0.78;
-  --nebula-glow: 0 0 12px color-mix(in srgb, var(--nebula-lavender) 45%, transparent);
+  --nebula-light: color-mix(in srgb, var(--dt-border) 20%, white);
+  --nebula-shade: color-mix(in srgb, var(--dt-border) 55%, var(--dt-foreground));
 }
 /* Wallpaper: painted once on the window shell, behind everything. Glass mode
    owns the same layer; if the user has glass on, the host's !important keeps
@@ -67,7 +73,7 @@ ${wallpaper ? `
 :root[data-hermes-theme="nebula"] [data-tree-group][data-window-top="true"]:not(:has(> [data-panel-header])) {
   background-color: transparent;
 }
-/* Lavender rims with a soft glow: sidebar, pane bodies, composer. Painted by
+/* Bevelled rims, no blur: sidebar, pane bodies, composer. Painted by
    pointer-transparent overlays so opaque kept-alive panes cannot cover them. */
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"]::after,
 :root[data-hermes-theme="nebula"] [data-tree-group] > div.relative.flex-1.overflow-hidden::after,
@@ -78,7 +84,7 @@ ${wallpaper ? `
   z-index: 7;
   pointer-events: none;
   border-radius: 0;
-  box-shadow: var(--nebula-frame), inset var(--nebula-glow);
+  box-shadow: var(--nebula-inset);
 }
 :root[data-hermes-theme="nebula"] [data-slot="composer-surface"]::after {
   border-radius: inherit;
@@ -88,32 +94,32 @@ ${wallpaper ? `
    kept-alive pane host; the box, hit-testing and scrolling are unchanged. */
 :root[data-hermes-theme="nebula"] [data-tree-group] > div.relative.flex-1.overflow-hidden::after {
   border-radius: 12px;
-  box-shadow: 0 0 0 12px var(--theme-background-seed), var(--nebula-frame), inset var(--nebula-glow);
+  box-shadow: 0 0 0 12px var(--theme-background-seed), var(--nebula-inset);
 }
 /* The sessions list is its own scrolling well: give it a rounded rim too. */
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sessions-mode] {
   border-radius: 12px;
-  box-shadow: var(--nebula-frame), inset var(--nebula-glow);
+  box-shadow: var(--nebula-inset);
   background-color: color-mix(in srgb, var(--theme-card-seed) 45%, transparent);
 }
 :root[data-hermes-theme="nebula"] [data-slot="composer-surface"] {
   border-color: var(--nebula-rim) !important;
-  box-shadow: var(--nebula-glow);
+  box-shadow: none;
 }
 :root[data-hermes-theme="nebula"] [data-slot="composer-surface"]:focus-within {
-  box-shadow: 0 0 14px color-mix(in srgb, var(--nebula-cyan) 45%, transparent);
+  box-shadow: 0 0 0 1px var(--nebula-cyan);
 }
 /* Navigation chips: rounder, outlined in the row's own hue (set by the theme)
-   with a matching glow; the selected row brightens. */
+   with a raised bevel; the selected row sinks and takes its hue. */
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sidebar="menu-button"]:has([data-tour^="sidebar-nav-"]) {
   border-radius: 10px;
   background-color: color-mix(in srgb, var(--theme-card-seed) 60%, transparent);
-  box-shadow: 0 0 8px color-mix(in srgb, var(--nebula-row-ink, var(--nebula-lavender)) 30%, transparent);
+  box-shadow: inset 2px 2px 0 var(--nebula-light), inset -2px -2px 0 var(--nebula-shade);
 }
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sidebar="menu-button"]:has([data-tour^="sidebar-nav-"])[class~="bg-(--ui-control-active-background)"] {
   border-color: var(--nebula-row-ink, var(--nebula-lavender));
   background-color: var(--theme-accent-soft);
-  box-shadow: 0 0 12px color-mix(in srgb, var(--nebula-row-ink, var(--nebula-lavender)) 50%, transparent);
+  box-shadow: inset 2px 2px 0 var(--nebula-shade), inset -2px -2px 0 var(--nebula-light);
 }
 /* Session rows: rounded like Retroma; hover and the active row get a rim. */
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-slot="row-button"] {
@@ -123,7 +129,7 @@ ${wallpaper ? `
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 40%, transparent);
 }
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-slot="row-button"][class~="bg-(--ui-row-active-background)"] {
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 60%, transparent), var(--nebula-glow);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 60%, transparent), inset 1px 1px 0 var(--nebula-shade), inset -1px -1px 0 var(--nebula-light);
 }
 /* Section caption glyph: the native 8px dithered square becomes the sparkle,
    painted by an overlay so the caption's geometry is unchanged. */
@@ -151,7 +157,7 @@ ${sparkle ? `
    stays unboxed on the scene; code cards get a translucent dark card. */
 :root[data-hermes-theme="nebula"] [data-slot="aui_user-message-root"] .composer-human-message {
   border-color: var(--dt-user-bubble-border);
-  box-shadow: var(--nebula-glow);
+  box-shadow: inset 1px 1px 0 var(--nebula-light), inset -1px -1px 0 var(--nebula-shade);
 }
 :root[data-hermes-theme="nebula"] [data-slot="code-card"] {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 60%, transparent);
@@ -162,7 +168,7 @@ ${font ? `
   font-family: 'Nebula Pixel', var(--dt-font-sans, sans-serif);
   letter-spacing: 0.12em;
   color: var(--nebula-lavender);
-  text-shadow: 0 0 12px color-mix(in srgb, var(--nebula-lavender) 60%, transparent);
+  text-shadow: 2px 2px 0 var(--nebula-shade);
 }` : ''}
 /* Scrollbar thumb in lavender rather than the foreground-derived grey. */
 :root[data-hermes-theme="nebula"] {
@@ -180,7 +186,7 @@ async function loadAsset(file) {
 
 export default {
   id: 'nebula-skin', name: 'Nebula Skin', defaultEnabled: false,
-  description: 'Optional station wallpaper, lavender glow rims and pixel wordmark for the Nebula theme. Remembers your palette command choice.',
+  description: 'Optional station wallpaper, crisp bevelled rims and pixel wordmark for the Nebula theme. Remembers your palette command choice.',
   register(ctx) {
     let style = null
     let disposed = false

@@ -4,6 +4,7 @@
 import { PALETTE_AREA, host } from 'data:text/javascript;base64,ZXhwb3J0IGNvbnN0IFRIRU1FU19BUkVBPSd0aGVtZXMnOyBleHBvcnQgY29uc3QgUEFMRVRURV9BUkVBPSJwYWxldHRlIjsgZXhwb3J0IGNvbnN0IGhvc3Q9e25vdGlmeTpuPT5nbG9iYWxUaGlzLm5vdGlmaWNhdGlvbnMucHVzaChuKX07'
 
 const WALLPAPER_FILE = 'nebula-station.webp'
+const SPACE_FILE = 'cosmos-space.webp'
 const FONT_FILE = 'silkscreen.woff2'
 const SPARKLE_FILE = 'sparkle.png'
 
@@ -193,25 +194,36 @@ export default {
     let disposed = false
     let userChanged = false
     let assets = null
+    let enabledState = false
+    let background = 'station'
+    let backgroundChanged = false
+    let paintVersion = 0
     let pendingSave = Promise.resolve()
     const removeStyle = () => { style?.remove(); style = null }
     const loadAssets = async () => {
       if (assets) return assets
-      const [wallpaper, font, sparkle] = await Promise.all([loadAsset(WALLPAPER_FILE), loadAsset(FONT_FILE), loadAsset(SPARKLE_FILE)].map(p => p.catch(() => null)))
-      assets = { wallpaper, font, sparkle }
+      const [wallpaper, space, font, sparkle] = await Promise.all([loadAsset(WALLPAPER_FILE), loadAsset(SPACE_FILE), loadAsset(FONT_FILE), loadAsset(SPARKLE_FILE)].map(p => p.catch(() => null)))
+      assets = { wallpaper, space, font, sparkle }
       if (!wallpaper && !disposed) host.notify({ kind: 'error', message: 'Cosmos wallpaper could not be read; the skin is on without it. Is assets/nebula-station.webp installed?' })
       return assets
     }
     const apply = async enabled => {
       if (disposed) return
+      enabledState = enabled
+      const version = ++paintVersion
       if (!enabled) { removeStyle(); return }
-      if (style) return
       const loaded = await loadAssets()
-      if (disposed || style) return
-      style = document.createElement('style')
-      style.dataset.nebulaSkin = ''
-      style.textContent = skinCss(loaded)
-      document.head.append(style)
+      if (disposed || version !== paintVersion) return
+      const wallpaper = background === 'space' ? loaded.space : loaded.wallpaper
+      if (!wallpaper) {
+        host.notify({ kind: 'error', message: 'The selected Cosmos background could not be read. Check the installed assets.' })
+      }
+      if (!style) {
+        style = document.createElement('style')
+        style.dataset.nebulaSkin = ''
+        document.head.append(style)
+      }
+      style.textContent = skinCss({ ...loaded, wallpaper })
     }
     const choose = enabled => {
       if (disposed) return
@@ -229,15 +241,33 @@ export default {
     }
     const disable = () => choose(false)
     const enable = () => choose(true)
-    Promise.resolve().then(() => ctx.storage.get('enabled')).then(enabled => {
-      if (!userChanged && !disposed) return apply(enabled === true)
+    const chooseBackground = value => {
+      if (disposed) return
+      backgroundChanged = true
+      background = value
+      const applied = apply(enabledState)
+      pendingSave = pendingSave.then(() => applied).then(() => ctx.storage.set('background', value))
+        .then(() => {
+          if (!disposed) host.notify({ kind: 'info', message: `Cosmos background: ${value === 'space' ? 'space without station' : 'space station'}.${enabledState ? '' : ' Enable Cosmos skin to see it.'}` })
+        }).catch(() => {
+          if (!disposed) host.notify({ kind: 'error', message: 'Cosmos background preference could not be saved.' })
+        })
+      return pendingSave
+    }
+    Promise.resolve().then(() => Promise.all([ctx.storage.get('enabled'), Promise.resolve().then(() => ctx.storage.get('background')).catch(() => 'station')])).then(([enabled, savedBackground]) => {
+      if (disposed) return
+      if (!backgroundChanged) background = savedBackground === 'space' ? 'space' : 'station'
+      return apply(userChanged ? enabledState : enabled === true)
     }).catch(() => {
       if (!disposed && !userChanged) host.notify({ kind: 'error', message: 'Could not restore the Cosmos skin preference; use the palette to enable it.' })
     })
     for (const [id, label, run] of [
       ['enable', 'Enable Cosmos skin', enable],
       ['disable', 'Disable Cosmos skin', disable],
-      ['toggle', 'Toggle Cosmos skin', () => style ? disable() : enable()]
+      ['toggle', 'Toggle Cosmos skin', () => enabledState ? disable() : enable()],
+      ['background-space', 'Cosmos background: without space station', () => chooseBackground('space')],
+      ['background-station', 'Cosmos background: with space station', () => chooseBackground('station')],
+      ['background-toggle', 'Toggle Cosmos background (station / no station)', () => chooseBackground(background === 'station' ? 'space' : 'station')]
     ]) ctx.register({ id, area: PALETTE_AREA, data: { label, keywords: ['cosmos', 'nebula', 'space', 'skin', 'wallpaper'], run } })
     ctx.onDispose(() => { disposed = true; removeStyle() })
   }

@@ -4,6 +4,12 @@ Optional decoration for the [Cosmos Theme](../nebula-theme/README.md): a pixel-a
 
 The skin only paints while the Cosmos theme is selected; enabling it under another theme changes nothing. Native sizes, padding, hit areas, drag regions and body fonts are untouched. Registration is inert: use **⌘K → Enable Cosmos skin** (or Toggle/Disable). Your choice is remembered per client and restored on the next launch.
 
+## Background selection
+
+Use **⌘K → Toggle Cosmos background (station / no station)**, or choose **Cosmos background: without space station** / **with space station** directly. The choice is saved separately from skin enablement and restored on reload; choosing a background does not enable a disabled skin or select a theme.
+
+The station-free wallpaper (`assets/cosmos-space.webp`) is the user's original ultrawide `asset_7.png`, converted to WebP without cropping (1916 × 821). Both background variants were supplied in the original space-theme asset bundle. The plugin keeps its `nebula-skin` ID and directory for saved-preference compatibility.
+
 ## Installation
 
 On the computer running Desktop, install the theme first, then:

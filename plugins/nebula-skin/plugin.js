@@ -101,7 +101,7 @@ ${wallpaper ? `
   box-shadow: var(--nebula-glow);
 }
 :root[data-hermes-theme="nebula"] [data-slot="composer-surface"]:focus-within {
-  box-shadow: 0 0 14px color-mix(in srgb, var(--nebula-cyan) 45%, transparent);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--nebula-lavender) 45%, transparent);
 }
 /* Navigation chips: rounder, outlined in the row's own hue (set by the theme)
    with a matching glow; the selected row brightens. */

@@ -177,6 +177,20 @@ try {
       const roles = await page.evaluate(() => { const s = getComputedStyle(document.documentElement); return Object.fromEntries(['--nebula-cyan', '--nebula-gold', '--nebula-lavender', '--nebula-accent', '--nebula-magenta', '--nebula-blue', '--nebula-warm', '--nebula-meta', '--nebula-placeholder', '--ui-text-quaternary', '--ui-stroke-secondary', '--ui-bg-input', '--ui-success', '--ui-warning', '--ui-danger'].map(k => [k, s.getPropertyValue(k).trim()])) })
       assert.deepEqual(roles, { '--nebula-cyan': '#47d9ff', '--nebula-gold': '#ffd86a', '--nebula-lavender': '#b35cff', '--nebula-accent': '#8d63ff', '--nebula-magenta': '#f05cff', '--nebula-blue': '#497bff', '--nebula-warm': '#ffb878', '--nebula-meta': '#b8b4d9', '--nebula-placeholder': '#7e82ae', '--ui-text-quaternary': '#7e82ae', '--ui-stroke-secondary': '#3e55d9', '--ui-bg-input': '#1b2252', '--ui-success': '#52e6b4', '--ui-warning': '#ffc857', '--ui-danger': '#ff6584' })
     }
+    const focusGlow = await page.evaluate(async () => {
+      const composer = document.querySelector('#composer-surface');
+      const input = document.createElement('input');
+      composer.append(input); input.focus();
+      await new Promise(resolve => setTimeout(resolve, 350));
+      const actual = getComputedStyle(composer).boxShadow;
+      const probe = document.createElement('div');
+      probe.style.boxShadow = '0 0 14px color-mix(in srgb, var(--nebula-lavender) 45%, transparent)';
+      composer.append(probe);
+      const expected = getComputedStyle(probe).boxShadow;
+      probe.remove(); input.remove();
+      return { actual, expected };
+    });
+    assert.equal(focusGlow.actual, focusGlow.expected, 'focused composer uses the shared purple glow');
     const codeBackdrops = await page.evaluate(() => {
       const slots = ['code-card', 'diff-lines', 'file-diff-panel'];
       return slots.map(slot => {

@@ -169,20 +169,9 @@ try {
     for (const id of ['sidebar', 'pane-body', 'composer-surface']) {
       const rim = await page.locator('#' + id).evaluate(e => { const s = getComputedStyle(e, '::after'); return [s.content, s.pointerEvents, s.boxShadow] })
       assert.notEqual(rim[0], 'none', id); assert.equal(rim[1], 'none'); assert.notEqual(rim[2], 'none')
-      // Crisp directional bevel: a 2px top-left and a 2px bottom-right layer.
-      const layers = shadowLayers(rim[2])
-      assert(layers.some(l => l[0] === 2 && l[1] === 2) && layers.some(l => l[0] === -2 && l[1] === -2), `${id} rim is a directional bevel: ${rim[2]}`)
+      // Restore the original soft rim glow; the new palette stays independent.
+      assert(shadowLayers(rim[2]).some(l => l[2] > 0), `${id} retains its original glow: ${rim[2]}`)
     }
-    // No broad glow anywhere the skin paints a rim: every shadow layer has 0 blur.
-    const painted = await page.evaluate(() => {
-      const out = []
-      for (const [sel, pseudo] of [['#sidebar', '::after'], ['#pane-body', '::after'], ['#composer-surface', '::after'], ['#composer-surface', null], ['#sessions-well', null],
-        ['[data-tour="sessions-sidebar"] [data-sidebar="menu-button"]', null], ['[data-slot="row-button"]', null], ['.composer-human-message', null], ['#wordmark', null]])
-        for (const e of document.querySelectorAll(sel)) { const s = getComputedStyle(e, pseudo); out.push([sel + (pseudo || ''), s.boxShadow, s.textShadow]) }
-      return out
-    })
-    assert(painted.length >= 10, 'rimmed elements found')
-    for (const [sel, box, text] of painted) for (const l of [...shadowLayers(box), ...shadowLayers(text)]) assert.equal(l[2], 0, `${mode} ${sel} has a blurred shadow: ${box} / ${text}`)
     if (mode === 'dark') {
       // Exact role mapping reaches the rendered tokens.
       const roles = await page.evaluate(() => { const s = getComputedStyle(document.documentElement); return Object.fromEntries(['--nebula-cyan', '--nebula-gold', '--nebula-lavender', '--nebula-accent', '--nebula-magenta', '--nebula-blue', '--nebula-warm', '--nebula-meta', '--nebula-placeholder', '--ui-text-quaternary', '--ui-stroke-secondary', '--ui-bg-input', '--ui-success', '--ui-warning', '--ui-danger'].map(k => [k, s.getPropertyValue(k).trim()])) })

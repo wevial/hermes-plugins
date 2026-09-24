@@ -72,8 +72,14 @@ ${wallpaper ? `
   --pane-tab-active-bg: color-mix(in srgb, var(--theme-card-seed) 65%, transparent);
   background-color: transparent;
 }
-:root[data-hermes-theme="nebula"] [data-tree-group][data-window-top="true"]:not(:has(> [data-panel-header])) {
+/* Clear the group behind the header too, including the Bot Mode override.
+   Content panes retain their own editor/sidebar fills and inherited tokens. */
+:root[data-hermes-theme="nebula"] [data-contrib-shell] [data-tree-group][data-window-top="true"] {
   background-color: transparent;
+}
+/* Move the removed backing layer below the header, preserving content contrast. */
+:root[data-hermes-theme="nebula"] [data-contrib-shell] [data-tree-group][data-window-top="true"] > .relative.min-h-0.min-w-0.flex-1.overflow-hidden {
+  background-color: var(--ui-editor-surface-background);
 }
 /* Lavender rims with a soft glow: sidebar, pane bodies, composer. Painted by
    pointer-transparent overlays so opaque kept-alive panes cannot cover them. */

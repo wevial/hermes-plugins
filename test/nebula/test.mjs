@@ -184,6 +184,10 @@ try {
     await page.evaluate(() => { window.failBackgroundRead = false })
     // Bot Mode roster group paints the editor surface natively; the skin must
     // give it the sidebar's near-opaque fill (live screenshot regression).
+    assert.equal(alpha(await page.locator('#panel').evaluate(e => getComputedStyle(e).backgroundColor)), 0, 'top group must not tint the transparent header from underneath')
+    await page.locator('[data-tree-group="mock-bots"]').evaluate(e => e.dataset.windowTop = 'true'); await settle()
+    assert.equal(alpha(await page.locator('[data-tree-group="mock-bots"]').evaluate(e => getComputedStyle(e).backgroundColor)), 0, 'top bot group must also reveal wallpaper')
+    await page.locator('[data-tree-group="mock-bots"]').evaluate(e => delete e.dataset.windowTop); await settle()
     for (const id of ['titlebar', 'titlebar-strip']) {
       assert.equal(alpha(await page.locator('#' + id).evaluate(e => getComputedStyle(e).backgroundColor)), 0, `${id} reveals wallpaper`)
     }

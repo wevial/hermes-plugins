@@ -135,7 +135,6 @@ export const colorCss = `
 :root[data-hermes-theme="nebula"][data-hermes-mode="dark"] [data-slot="command-item"]:not([data-disabled="true"]):not([aria-disabled="true"]):is([data-selected="true"], [aria-selected="true"], :hover, :focus-visible) {
   background-color: #3e55d9 !important;
   color: #f4f1ff !important;
-  box-shadow: inset 3px 0 0 #b35cff;
 }
 :root[data-hermes-theme="nebula"] [data-slot="composer-completion-drawer"] {
   background-color: rgb(from var(--dt-popover) r g b / 1);

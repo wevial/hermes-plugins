@@ -195,6 +195,20 @@ try {
       const roles = await page.evaluate(() => { const s = getComputedStyle(document.documentElement); return Object.fromEntries(['--nebula-cyan', '--nebula-gold', '--nebula-lavender', '--nebula-accent', '--nebula-magenta', '--nebula-blue', '--nebula-warm', '--nebula-meta', '--nebula-placeholder', '--ui-text-quaternary', '--ui-stroke-secondary', '--ui-bg-input', '--ui-success', '--ui-warning', '--ui-danger'].map(k => [k, s.getPropertyValue(k).trim()])) })
       assert.deepEqual(roles, { '--nebula-cyan': '#47d9ff', '--nebula-gold': '#ffd86a', '--nebula-lavender': '#b35cff', '--nebula-accent': '#8d63ff', '--nebula-magenta': '#f05cff', '--nebula-blue': '#497bff', '--nebula-warm': '#ffb878', '--nebula-meta': '#b8b4d9', '--nebula-placeholder': '#7e82ae', '--ui-text-quaternary': '#7e82ae', '--ui-stroke-secondary': '#3e55d9', '--ui-bg-input': '#1b2252', '--ui-success': '#52e6b4', '--ui-warning': '#ffc857', '--ui-danger': '#ff6584' })
     }
+    if (mode === 'dark') {
+      await page.evaluate(() => { document.querySelector('#palette').hidden = false; document.querySelector('[data-slot="command-item"]').dataset.selected = 'true' })
+      const rows = page.locator('[data-slot="command-item"]');
+      const paint = loc => loc.evaluate(e => { const s = getComputedStyle(e); return { bg: s.backgroundColor, fg: s.color, edge: s.boxShadow } });
+      const selected = await paint(rows.nth(0));
+      await rows.nth(1).hover(); await settle();
+      assert.deepEqual(await paint(rows.nth(1)), selected, 'pointer hover matches keyboard selection');
+      assert.equal(selected.bg, 'rgb(62, 85, 217)');
+      assert.notEqual((await paint(rows.nth(2))).bg, selected.bg, 'idle rows remain distinct');
+      assert(ratio(hex('#3e55d9'), hex('#f4f1ff')) >= 4.5, 'selected command text remains readable');
+      await rows.nth(1).evaluate(e => e.dataset.disabled = 'true');
+      assert.notEqual((await paint(rows.nth(1))).bg, selected.bg, 'disabled rows do not gain the highlight');
+      await page.evaluate(() => { document.querySelector('#palette').hidden = true; document.querySelectorAll('[data-slot="command-item"]').forEach(e => { delete e.dataset.selected; delete e.dataset.disabled }) });
+    }
     const focusGlow = await page.evaluate(async () => {
       const composer = document.querySelector('#composer-surface');
       const input = document.createElement('input');

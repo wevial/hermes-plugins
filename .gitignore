@@ -6,3 +6,7 @@ test/theme-studio/swatch-palettes.json
 test/theme-studio/swatch.html
 FINDINGS.md
 .DS_Store
+
+# Local Retroma verification artifacts and operational notes
+test/retroma/.local/
+retroma-worker-report.txt

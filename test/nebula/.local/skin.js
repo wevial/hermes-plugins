@@ -83,6 +83,19 @@ ${wallpaper ? `
 :root[data-hermes-theme="nebula"] [data-slot="composer-surface"]::after {
   border-radius: inherit;
 }
+/* Rounded content bodies like Retroma. The overlay's outer ring is trimmed
+   by PaneBody's overflow-hidden, leaving indigo corner wedges above any
+   kept-alive pane host; the box, hit-testing and scrolling are unchanged. */
+:root[data-hermes-theme="nebula"] [data-tree-group] > div.relative.flex-1.overflow-hidden::after {
+  border-radius: 12px;
+  box-shadow: 0 0 0 12px var(--theme-background-seed), var(--nebula-frame), inset var(--nebula-glow);
+}
+/* The sessions list is its own scrolling well: give it a rounded rim too. */
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sessions-mode] {
+  border-radius: 12px;
+  box-shadow: var(--nebula-frame), inset var(--nebula-glow);
+  background-color: color-mix(in srgb, var(--theme-card-seed) 45%, transparent);
+}
 :root[data-hermes-theme="nebula"] [data-slot="composer-surface"] {
   border-color: var(--nebula-rim) !important;
   box-shadow: var(--nebula-glow);

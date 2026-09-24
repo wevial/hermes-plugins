@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Retroma — MOCK preview, not real Hermes</title>
+<link rel="stylesheet" href="native.css">
+<style>
+/* Representative layout only. Anchors match installed source; this is not a
+   compiled Hermes UI. Native stylesheet supplies color and input contracts. */
+* {box-sizing:border-box} body {margin:0;font-family:sans-serif;color:var(--dt-foreground);background:var(--dt-background)}
+.mock-banner {padding:14px 20px;background:var(--dt-popover);border-bottom:1px solid var(--dt-border);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.mock-banner strong {margin-right:auto}.workspace {display:grid;grid-template-columns:220px minmax(0,1fr);grid-template-areas:"sessions main" "bots main";gap:10px;padding:12px;min-height:650px}
+[data-tree-group] {position:relative;display:flex;flex-direction:column;min-width:0;background:var(--ui-editor-surface-background);overflow:hidden}
+[data-panel-header] {padding:12px;background:var(--ui-sidebar-surface-background);display:flex;align-items:center;gap:10px;min-height:48px}
+/* Source tree-group.tsx top edge: left/right drag spacers + center strip under
+   one header; pane-tab.tsx tabs take --pane-tab-* through --tab-bg. */
+.titlebar-spacer {flex:none}
+.titlebar-strip {display:flex;flex:1;min-width:0;align-items:stretch;align-self:stretch}
+.titlebar-tab {position:relative;display:flex;align-items:center;padding:0 10px;background:var(--tab-bg)}
+#titlebar {padding:0;gap:0;height:44px;min-height:44px}
+.titlebar-tab[data-active="false"]:hover {box-shadow:inset 0 0 0 100vmax color-mix(in srgb,#000 var(--ui-tab-hover-darken,4%),transparent)}
+#sidebar {grid-area:sessions;position:relative;background:var(--ui-sidebar-surface-background)} .body {padding:24px}[data-sidebar=content] {padding:10px} [data-sidebar=menu] {list-style:none;margin:0;padding:6px;display:grid;gap:4px}
+[data-sidebar=menu-button] {height:28px;width:100%;border:1px solid transparent;border-radius:6px;text-align:left;padding:0 8px;font-size:13px;background:transparent;color:var(--ui-text-secondary)}
+.bot-pane {grid-area:bots;margin:0;background:var(--ui-sidebar-surface-background)} .bot-toolbar{display:flex;align-items:center;justify-content:space-between;padding:10px;gap:8px;font-size:12px}
+[data-slot=bots-roster] {padding:8px 6px;display:grid;gap:4px;min-height:125px}
+[data-slot=row-button] {width:100%;min-height:36px;padding:8px;border:0;border-radius:6px;text-align:left;font-size:13px;background:transparent;color:var(--ui-text-primary)}
+#profile{padding:10px} [class~="text-(--ui-text-tertiary)"]{color:var(--ui-text-tertiary)} .status-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--dt-destructive);margin-right:6px}
+[data-slot=composer-surface] {position:relative;isolation:isolate;margin-top:20px;border-radius:8px;overflow:hidden;border:1px solid var(--dt-input);background:var(--composer-fill)}
+#input:disabled {opacity:.5}
+button {font:inherit} [data-slot=button] {display:inline-flex;align-items:center;justify-content:center;border:0;border-radius:2.5px;padding:4px 10px;font-size:12px;line-height:16px;color:var(--ui-text-primary);background:var(--dt-secondary);box-shadow:none}
+[data-slot=button][data-variant=ghost], [data-slot=button][data-variant=outline], [data-slot=button][data-variant=text] {background:transparent}
+[data-slot=button][data-variant=default] {background:var(--dt-primary);color:var(--dt-primary-foreground)}
+
+[data-slot=button]:disabled {opacity:.5;pointer-events:none}
+[data-slot=input] {width:100%;padding:7px 9px;font:inherit;color:var(--dt-foreground);background:var(--ui-bg-input);border:1px solid var(--dt-border);border-radius:4px}
+label {display:block;margin:16px 0 6px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.aui-md {line-height:1.65} h1 {font-size:26px} h2{font-size:20px}
+#composer {min-height:65px;padding:12px;margin-top:0;outline-color:var(--dt-ring)}
+[data-slot="composer-completion-drawer"] {background:var(--dt-popover);padding:12px;border:1px solid var(--dt-border);border-radius:4px;margin-top:12px}
+pre {white-space:pre-wrap;background:var(--dt-muted);padding:12px;font-family:monospace;font-size:12px} #terminal{font-family:monospace}
+@media(max-width:650px){.workspace{grid-template-columns:minmax(0,1fr);grid-template-areas:"main"}#sidebar,.bot-pane{display:none}.body{padding:16px}}
+
+/* Source tree-group.tsx: an opaque kept pane covers its parent's shadow. */
+.pane-body {position:relative;min-width:0;overflow:hidden;flex:1}
+.pane-layer {background:var(--ui-editor-surface-background);overflow:auto;height:100%}
+#sessions-well {height:190px;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+#sessions-well [data-slot=sidebar-group-label] {padding:8px;font-size:11px}
+#sessions-well [data-slot=row-button] {height:28px;min-height:28px;padding:4px 8px}
+/* cva native control variants (utilities layer); host native.css is unlayered. */
+@layer utilities {
+[data-slot=button] {appearance:auto;--tw-ring-shadow:0 0 #0000;--tw-ring-offset-shadow:0 0 #0000}
+[data-slot=button][data-variant=ghost] {background-color:transparent}
+[data-slot=button][data-variant=outline] {background-color:transparent;box-shadow:inset 0 0 0 1px var(--ui-stroke-secondary)}
+[data-slot=button]:focus-visible {box-shadow:var(--tw-ring-offset-shadow),var(--tw-ring-shadow)}
+}
+/* Cmd+K source-derived MOCK: fixed Radix content, direct Command, opaque
+   descendants and z-10 heading intentionally stress the overlaid rim. */
+#palette {position:fixed;left:50%;top:80px;transform:translateX(-50%);width:min(34rem,calc(100vw - 2rem));overflow:hidden;border-radius:12px;border:1px solid var(--stroke-nous);background:var(--ui-chat-bubble-background);color:var(--dt-popover-foreground);z-index:200}
+#palette [data-slot=command] {background:var(--dt-popover);overflow:hidden}
+#palette [data-slot=command-input-wrapper] {height:44px;display:flex;align-items:center;padding:0 12px;border-bottom:1px solid var(--dt-border);background:var(--dt-popover)}
+#palette input {width:100%;height:40px;border:0;background:transparent;color:inherit;font:inherit;outline:none}
+#palette [data-slot=command-list] {max-height:320px;overflow-y:auto;overflow-x:hidden;background:var(--dt-popover)}
+#palette [cmdk-group-heading] {position:sticky;top:0;z-index:10;background:var(--dt-popover);padding:12px;font-size:11px;letter-spacing:2px}
+#palette [data-slot=command-item] {position:relative;padding:8px 14px;background:var(--dt-popover)}
+#palette [aria-selected=true] {background:var(--dt-accent);color:var(--dt-accent-foreground)}
+</style><script src="apply.js"></script></head><body>
+<div class="mock-banner"><strong>MOCK · Retroma / Hermes-inspired DOM</strong><span>Not the real Hermes app</span>
+<button id="light">Light</button><button id="dark">Dark</button><button id="skin">Toggle tactile</button></div>
+<div class="workspace">
+<aside id="sidebar" data-slot="sidebar" data-tour="sessions-sidebar"><div data-sidebar="content" data-slot="sidebar-content"><div data-sidebar="group"><div data-sidebar="group-content"><ul data-sidebar="menu"><li data-sidebar="menu-item"><button id="nav-new-session" data-slot="sidebar-menu-button" data-sidebar="menu-button" data-active="false" aria-disabled="false" class=""><span data-tour="sidebar-nav-new-session">＋ New session</span></button></li><li data-sidebar="menu-item"><button id="nav-skills" data-slot="sidebar-menu-button" data-sidebar="menu-button" data-active="false" aria-disabled="false" class=""><span data-tour="sidebar-nav-skills">◇ Skills</span></button></li><li data-sidebar="menu-item"><button id="nav-messaging" data-slot="sidebar-menu-button" data-sidebar="menu-button" data-active="false" aria-disabled="false" class=""><span data-tour="sidebar-nav-messaging">▤ Messaging</span></button></li><li data-sidebar="menu-item"><button id="nav-artifacts" data-slot="sidebar-menu-button" data-sidebar="menu-button" data-active="false" aria-disabled="false" class="bg-(--ui-control-active-background)"><span data-tour="sidebar-nav-artifacts">▧ Artifacts</span></button></li><li data-sidebar="menu-item"><button id="nav-cron" data-slot="sidebar-menu-button" data-sidebar="menu-button" data-active="false" aria-disabled="false" class=""><span data-tour="sidebar-nav-cron">◷ Scheduled tasks</span></button></li></ul></div></div>
+<div id="sessions-well" data-sessions-mode="all"><div data-slot="sidebar-group"><div data-slot="sidebar-group-label">PINNED · MOCK</div><div data-slot="sidebar-group-content"><button data-slot="row-button">Example session</button></div></div><div data-slot="sidebar-group"><div data-slot="sidebar-group-label">SESSIONS · MOCK</div><div id="session-rows" data-slot="sidebar-group-content"></div></div></div></div>
+<div id="profile" data-slot="profile-switcher" role="group" aria-label="Profiles"><button id="profile-button" data-slot="button" data-variant="ghost" data-state="closed">▣ Example profile ▾</button></div>
+</aside>
+<div class="bot-pane" data-tree-group="mock-bots"><div><div id="bot-toolbar" class="bot-toolbar"><span>Bots · MOCK</span><div><button data-slot="button" data-variant="ghost" aria-label="Activity notifications">♧</button> <button data-slot="button" data-variant="ghost" aria-label="New bot">＋</button></div></div><div data-slot="bots-roster"><div><button id="bot-one" data-slot="row-button" data-roster-key="mock-a" class="bg-(--ui-row-active-background)"><div><span class="status-dot" id="bot-status"></span><span>Example assistant</span><span id="bot-age" class="text-(--ui-text-quaternary)"> · Today</span><div id="bot-detail" class="text-(--ui-text-tertiary)">Generic preview</div></div></button><button id="bot-two" data-slot="row-button" data-roster-key="mock-b">Another assistant</button></div></div></div></div>
+<main style="grid-area:main" id="panel" data-tree-group="mock-main" data-window-top="true"><div id="titlebar" data-panel-header><div id="titlebar-left" class="titlebar-spacer" style="width:var(--panel-titlebar-left, 96px)"></div><div id="titlebar-strip" class="titlebar-strip"><div id="tab-active" class="titlebar-tab" data-slot="pane-tab" data-tree-tab="mock-main" data-active="true" style="--tab-bg:var(--pane-tab-active-bg,var(--ui-editor-surface-background));box-shadow:inset 0 -2px 0 var(--theme-primary)">Example workspace</div><div id="tab-idle" class="titlebar-tab" data-slot="pane-tab" data-active="false" data-tree-tab="mock-notes" style="--tab-bg:var(--pane-tab-strip-bg,var(--ui-sidebar-surface-background))">Terminal</div><div id="tab-bot-a" class="titlebar-tab" data-slot="pane-tab" data-active="false" data-tree-tab="mock-bot-a" style="--tab-bg:var(--pane-tab-strip-bg,var(--ui-sidebar-surface-background))"><span style="color:#00b5bb;margin-right:5px">●</span>Bot Alpha</div><div id="tab-bot-b" class="titlebar-tab" data-slot="pane-tab" data-active="false" data-tree-tab="mock-bot-b" style="--tab-bg:var(--pane-tab-strip-bg,var(--ui-sidebar-surface-background))"><span style="color:#674397;margin-right:5px">●</span>Bot Beta</div></div><div id="titlebar-right" class="titlebar-spacer" style="width:var(--panel-titlebar-right, 96px)"></div></div>
+<div id="pane-body" class="pane-body relative min-h-0 min-w-0 flex-1 overflow-hidden"><div class="pane-layer"><div class="body"><div class="toolbar"><button id="action" data-slot="button" data-variant="secondary" data-size="sm">New task</button><input id="input" data-slot="input" class="desktop-input-chrome" aria-label="Example field" placeholder="Type to test input"><button id="disabled" disabled data-slot="button" data-variant="outline">Unavailable</button><button data-slot="button" data-variant="text">Inline action</button></div>
+<div data-slot="aui_assistant-message-content"><article class="aui-md"><h1 id="heading">A little more character</h1><p>Lavender frames surround cyan navigation wells. Rainbow accents distinguish navigation roles, with a strong inset edge marking the selected page.</p><h2>Optional tactile controls</h2><p>Switch the skin on to see raised buttons and inset panels. The native sizes and fonts stay in place.</p><pre id="code">const greeting = "Hello, world";</pre></article></div>
+<form data-slot="composer-root"><div id="composer-surface" data-slot="composer-surface"><div id="composer" data-slot="composer-rich-input" contenteditable="true" role="textbox" aria-label="Mock composer" data-placeholder="Write a generic message">Write a generic message</div></div></form>
+<div id="popup" data-slot="composer-completion-drawer" data-state="open" role="listbox" aria-label="Mock completions"><div role="option" aria-selected="true">Example completion</div><div role="option">Another option</div></div>
+<pre id="terminal">$ echo "Preview ready"
+Preview ready</pre>
+</div></div></div></main></div>
+<div id="palette" role="dialog" aria-label="Command palette MOCK" data-state="open" class="w-[min(34rem,calc(100vw-2rem))]" hidden><h2 hidden>Command palette MOCK</h2><div data-slot="command"><div data-slot="command-input-wrapper"><input id="palette-input" data-slot="command-input" aria-label="Search mock commands" placeholder="Search mock commands"></div><div data-slot="command-list"><div cmdk-group-heading>MOCK COMMANDS</div><div id="palette-rows"></div></div></div></div>
+<div id="unrelated-dialog" role="dialog" hidden><div data-slot="command">Unrelated picker</div></div>
+<div id="unrelated-hud" role="dialog" class="w-[min(34rem,calc(100vw-2rem))]" hidden>Unrelated HUD</div>
+<script type="module">
+import themePlugin, {theme} from './theme.js'; import skinPlugin from './skin.js';
+// Only MOCK behavior; does not claim to execute Radix/cmdk keyboard machinery.
+const palette=document.getElementById('palette'),search=document.getElementById('palette-input');
+document.getElementById('palette-rows').innerHTML=Array.from({length:18},(_,i)=>`<div data-slot="command-item" role="option" aria-selected="${i===0}">Sample action ${i+1}</div>`).join('');
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key==='k'){e.preventDefault();palette.hidden=!palette.hidden;if(!palette.hidden)search.focus()}if(e.key==='Escape')palette.hidden=true});
+window.contributions=[];window.notifications=[];window.storageLog=[];
+document.querySelector('#session-rows').innerHTML=Array.from({length:16},(_,i)=>`<button data-slot="row-button">Sample session ${i+1}</button>`).join('');
+function context(disposers){const store={};return {register(c){contributions.push(c);const dispose=()=>{const i=contributions.indexOf(c);if(i>=0)contributions.splice(i,1)};disposers.push(dispose);return dispose},onDispose(fn){disposers.push(fn)},storage:{get(k){window.storageLog.push('get:'+k);return store[k]},set(k,v){window.storageLog.push('set:'+k);store[k]=v},remove(k){window.storageLog.push('remove:'+k);delete store[k]}}}}
+window.registerPlugins=()=>{const td=[],sd=[];themePlugin.register(context(td));skinPlugin.register(context(sd));window.themeDispose=()=>td.forEach(f=>f());window.skinDispose=()=>sd.forEach(f=>f())};
+const rootBefore=document.documentElement.outerHTML.split('<head>')[0],storageBefore=JSON.stringify(localStorage);
+registerPlugins();
+window.registrationProof={notifications:notifications.length,root:document.documentElement.outerHTML.split('<head>')[0]===rootBefore,storage:JSON.stringify(localStorage)===storageBefore,storageCalls:window.storageLog.length,skinStyles:document.querySelectorAll('style[data-retroma-tactile]').length,defaultEnabled:skinPlugin.defaultEnabled,themeCount:contributions.filter(c=>c.area==='themes').length};
+window.run=id=>contributions.find(c=>c.id===id)?.data.run();
+window.selectMode=mode=>paint(theme,mode);
+document.getElementById('light').onclick=()=>selectMode('light');document.getElementById('dark').onclick=()=>selectMode('dark');document.getElementById('skin').onclick=()=>run('toggle');
+// Preview controls apply only to this isolated MOCK document.
+selectMode('light');window.ready=true;
+</script></body></html>

@@ -110,6 +110,7 @@ assert((await read('components/chat/widget-shell.ts')).includes('bg-(--ui-widget
 assert((await read('components/assistant-ui/thread/changed-files-card.tsx')).includes('data-slot="aui_changed-files"'), 'changed-files slot contract')
 fixture = fixture.replace('id="titlebar-strip" class="titlebar-strip"', 'id="titlebar-strip" data-zone-tabstrip="mock-main" class="titlebar-strip"')
   .replace('</style>', '[data-zone-tabstrip]{background:var(--ui-sidebar-surface-background);--pane-tab-active-bg:var(--ui-sidebar-surface-background)}</style>')
+fixture = fixture.replace('<div data-slot="sidebar-group-label">', '<div data-sessions-project="mock"><button data-slot="row-button" class="p-0"><span id="project-label">Example project</span></button></div><div data-slot="sidebar-group-label">')
 fixture = fixture.replace('skinPlugin.register(context(sd));', 'const sc=context(sd);skinPlugin.register(sc);window.reloadSkin=()=>{sd.splice(0).forEach(f=>f());skinPlugin.register(sc)};')
 fixture = fixture.replace("get(k){window.storageLog.push('get:'+k);", "get(k){if(k==='background' && window.failBackgroundRead)throw new Error('background read failed');window.storageLog.push('get:'+k);")
 assert(fixture.includes('window.reloadSkin='), 'reload fixture preserves the plugin storage namespace')
@@ -192,6 +193,12 @@ try {
     for (const id of ['titlebar', 'titlebar-strip']) {
       assert.equal(alpha(await page.locator('#' + id).evaluate(e => getComputedStyle(e).backgroundColor)), 0, `${id} reveals wallpaper`)
     }
+    assert.equal(await page.locator('#tab-active').evaluate(e => getComputedStyle(e).fontWeight), '700', 'tabs are bold')
+    if (mode === 'dark') {
+      assert.equal(await page.locator('#project-label').evaluate(e => getComputedStyle(e).color), 'rgb(244, 241, 255)', 'project labels use starlight ink')
+      assert.equal(await page.locator('#project-label').evaluate(e => getComputedStyle(e).fontWeight), '600')
+      assert.notEqual(await page.locator('#pinned-label').evaluate(e => getComputedStyle(e).color), 'rgb(141, 99, 255)', 'section headings are lighter than the primary accent')
+    }
     const tabs = await page.locator('.titlebar-tab').evaluateAll(es => es.map(e => ({ active: e.dataset.active, bg: getComputedStyle(e).backgroundColor })))
     for (const tab of tabs) assert(Math.abs(alpha(tab.bg) - (tab.active === 'true' ? .65 : .3)) < .01, 'tabs keep distinct translucent active/idle fills')
     const roster = await page.locator('[data-tree-group="mock-bots"]').evaluate(e => getComputedStyle(e).backgroundColor)
@@ -255,7 +262,7 @@ try {
     // per-row nav hues, rounded session rows, veiled files-changed widget.
     const lav = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--nebula-lavender').trim())
     const capColor = await page.locator('#pinned-label').evaluate(e => getComputedStyle(e).color)
-    assert.equal(capColor, await page.evaluate(l => { const d = document.createElement('div'); d.style.color = l; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c }, lav), 'caption is lavender: ' + capColor)
+    assert.equal(capColor, await page.evaluate(l => { const d = document.createElement('div'); d.style.color = l; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c }, mode === 'dark' ? `color-mix(in srgb, ${lav} 78%, #f4f1ff)` : lav), 'caption is lavender: ' + capColor)
     const glyph = await page.locator('#pinned-glyph').evaluate(e => [getComputedStyle(e).backgroundImage, getComputedStyle(e, '::after').backgroundImage, e.getBoundingClientRect().width])
     assert.equal(glyph[0], 'none', 'native dither removed'); assert.match(glyph[1], /^url\("data:image\/png;base64,/, 'sparkle painted'); assert.equal(glyph[2], 8, 'glyph box unchanged')
     const inks = await page.evaluate(() => [...document.querySelectorAll('[data-tour="sessions-sidebar"] [data-sidebar="menu-button"]')].map(b => [getComputedStyle(b).borderTopColor, getComputedStyle(b.querySelector('.codicon')).color, getComputedStyle(b).borderRadius]))

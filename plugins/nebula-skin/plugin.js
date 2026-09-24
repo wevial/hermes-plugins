@@ -57,6 +57,18 @@ ${wallpaper ? `
   font-family: var(--dt-font-mono);
   letter-spacing: 0.02em;
 }
+/* Stronger tab and sidebar hierarchy without changing session text. */
+:root[data-hermes-theme="nebula"] [data-tree-tab],
+:root[data-hermes-theme="nebula"] [data-tree-tab] .font-medium {
+  font-weight: 700;
+}
+:root[data-hermes-theme="nebula"][data-hermes-mode="dark"] [data-tour="sessions-sidebar"] [data-sessions-project] [data-slot="row-button"].p-0 > span {
+  color: #f4f1ff;
+  font-weight: 600;
+}
+:root[data-hermes-theme="nebula"][data-hermes-mode="dark"] [data-tour="sessions-sidebar"] span[class~="tracking-[0.16em]"] {
+  color: color-mix(in srgb, var(--nebula-lavender) 78%, #f4f1ff);
+}
 /* Top edge: the header band lets the wallpaper through; tabs get a faint tint. */
 :root[data-hermes-theme="nebula"] [data-tree-group][data-window-top="true"] > [data-panel-header] {
   --pane-tab-strip-bg: color-mix(in srgb, var(--theme-card-seed) 30%, transparent);

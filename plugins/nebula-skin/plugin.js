@@ -61,8 +61,15 @@ ${wallpaper ? `
 }
 /* Top edge: the header band lets the wallpaper through; tabs get a faint tint. */
 :root[data-hermes-theme="nebula"] [data-tree-group][data-window-top="true"] > [data-panel-header] {
-  --pane-tab-strip-bg: color-mix(in srgb, var(--theme-card-seed) 45%, transparent);
-  --pane-tab-active-bg: color-mix(in srgb, var(--theme-card-seed) 80%, transparent);
+  --pane-tab-strip-bg: color-mix(in srgb, var(--theme-card-seed) 30%, transparent);
+  --pane-tab-active-bg: color-mix(in srgb, var(--theme-card-seed) 65%, transparent);
+  background-color: transparent;
+}
+/* The strip paints its own opaque sidebar fill and resets the active-tab
+   token. Override that child layer as well as the surrounding header. */
+:root[data-hermes-theme="nebula"] [data-tree-group][data-window-top="true"] [data-zone-tabstrip] {
+  --pane-tab-strip-bg: color-mix(in srgb, var(--theme-card-seed) 30%, transparent);
+  --pane-tab-active-bg: color-mix(in srgb, var(--theme-card-seed) 65%, transparent);
   background-color: transparent;
 }
 :root[data-hermes-theme="nebula"] [data-tree-group][data-window-top="true"]:not(:has(> [data-panel-header])) {

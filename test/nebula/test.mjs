@@ -108,6 +108,8 @@ const sidebarIndex = await read('app/chat/sidebar/index.tsx')
 assert(sidebarIndex.includes('data-tour={`sidebar-nav-${item.id}`}') && sidebarIndex.includes('<Codicon name={codicon}'), 'nav row label handle + codicon contract')
 assert((await read('components/chat/widget-shell.ts')).includes('bg-(--ui-widget-surface-background)'), 'widget shell token contract')
 assert((await read('components/assistant-ui/thread/changed-files-card.tsx')).includes('data-slot="aui_changed-files"'), 'changed-files slot contract')
+fixture = fixture.replace('id="titlebar-strip" class="titlebar-strip"', 'id="titlebar-strip" data-zone-tabstrip="mock-main" class="titlebar-strip"')
+  .replace('</style>', '[data-zone-tabstrip]{background:var(--ui-sidebar-surface-background);--pane-tab-active-bg:var(--ui-sidebar-surface-background)}</style>')
 fixture = fixture.replace('skinPlugin.register(context(sd));', 'const sc=context(sd);skinPlugin.register(sc);window.reloadSkin=()=>{sd.splice(0).forEach(f=>f());skinPlugin.register(sc)};')
 fixture = fixture.replace("get(k){window.storageLog.push('get:'+k);", "get(k){if(k==='background' && window.failBackgroundRead)throw new Error('background read failed');window.storageLog.push('get:'+k);")
 assert(fixture.includes('window.reloadSkin='), 'reload fixture preserves the plugin storage namespace')
@@ -182,6 +184,11 @@ try {
     await page.evaluate(() => { window.failBackgroundRead = false })
     // Bot Mode roster group paints the editor surface natively; the skin must
     // give it the sidebar's near-opaque fill (live screenshot regression).
+    for (const id of ['titlebar', 'titlebar-strip']) {
+      assert.equal(alpha(await page.locator('#' + id).evaluate(e => getComputedStyle(e).backgroundColor)), 0, `${id} reveals wallpaper`)
+    }
+    const tabs = await page.locator('.titlebar-tab').evaluateAll(es => es.map(e => ({ active: e.dataset.active, bg: getComputedStyle(e).backgroundColor })))
+    for (const tab of tabs) assert(Math.abs(alpha(tab.bg) - (tab.active === 'true' ? .65 : .3)) < .01, 'tabs keep distinct translucent active/idle fills')
     const roster = await page.locator('[data-tree-group="mock-bots"]').evaluate(e => getComputedStyle(e).backgroundColor)
     assert(alpha(roster) >= 0.9, 'bot roster group must be near-opaque over the wallpaper: ' + roster)
     for (const id of ['sidebar', 'pane-body', 'composer-surface']) {

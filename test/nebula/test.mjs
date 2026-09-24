@@ -121,18 +121,22 @@ try {
     await page.evaluate(m => { selectMode(m); run('disable') }, mode); await waitSkin(false); await settle()
     assert.equal(await page.evaluate(() => document.documentElement.dataset.hermesTheme), 'nebula')
     const before = await metrics()
+    const alpha = c => { const m = c.match(/\/\s*([\d.]+)\)$/) || c.match(/^rgba\(.*,\s*([\d.]+)\)$/); return m ? Number(m[1]) : 1 }
     const shellBefore = await page.locator('#shell').evaluate(e => getComputedStyle(e).backgroundImage)
     assert.equal(shellBefore, 'none')
     await page.evaluate(() => run('enable')); await waitSkin(true); await settle()
     assert.deepEqual(await metrics(), before, 'geometry and fonts must not change')
     const shell = await page.locator('#shell').evaluate(e => getComputedStyle(e).backgroundImage)
     assert.match(shell, /^url\("data:image\/webp;base64,/, 'wallpaper is inlined from the plugin asset')
+    // Bot Mode roster group paints the editor surface natively; the skin must
+    // give it the sidebar's near-opaque fill (live screenshot regression).
+    const roster = await page.locator('[data-tree-group="mock-bots"]').evaluate(e => getComputedStyle(e).backgroundColor)
+    assert(alpha(roster) >= 0.9, 'bot roster group must be near-opaque over the wallpaper: ' + roster)
     for (const id of ['sidebar', 'pane-body', 'composer-surface']) {
       const rim = await page.locator('#' + id).evaluate(e => { const s = getComputedStyle(e, '::after'); return [s.content, s.pointerEvents, s.boxShadow] })
       assert.notEqual(rim[0], 'none', id); assert.equal(rim[1], 'none'); assert.notEqual(rim[2], 'none')
     }
     const veil = await page.locator('#panel').evaluate(e => getComputedStyle(e.querySelector('.pane-layer')).backgroundColor)
-    const alpha = c => { const m = c.match(/\/\s*([\d.]+)\)$/) || c.match(/^rgba\(.*,\s*([\d.]+)\)$/); return m ? Number(m[1]) : 1 }
     assert(alpha(veil) > 0.3 && alpha(veil) < 0.9, 'content surface is translucent over the wallpaper: ' + veil)
     const bar = await page.locator('#statusbar').evaluate(e => getComputedStyle(e).backgroundColor)
     assert.equal(alpha(bar), 1, 'status bar stays opaque: ' + bar)

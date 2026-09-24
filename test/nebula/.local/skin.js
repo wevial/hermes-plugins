@@ -1,7 +1,7 @@
 // Nebula Skin — station wallpaper, lavender glow rims and a pixel wordmark for
 // the Nebula theme. © 2026 Ko Vial, MIT. Silkscreen font © The Silkscreen
 // Project Authors, SIL OFL 1.1 (assets/OFL-Silkscreen.txt).
-import { PALETTE_AREA, host } from '@hermes/plugin-sdk'
+import { PALETTE_AREA, host } from 'data:text/javascript;base64,ZXhwb3J0IGNvbnN0IFRIRU1FU19BUkVBPSd0aGVtZXMnOyBleHBvcnQgY29uc3QgUEFMRVRURV9BUkVBPSJwYWxldHRlIjsgZXhwb3J0IGNvbnN0IGhvc3Q9e25vdGlmeTpuPT5nbG9iYWxUaGlzLm5vdGlmaWNhdGlvbnMucHVzaChuKX07'
 
 const WALLPAPER_FILE = 'nebula-station.webp'
 const FONT_FILE = 'silkscreen.woff2'

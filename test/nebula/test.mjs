@@ -74,15 +74,31 @@ fixture = fixture.replace('Retroma — MOCK preview', 'Nebula — MOCK preview')
   .replace('</main></div>\n<div id="palette"', '</main></div></div><footer id="statusbar" data-slot="statusbar" style="height:20px;padding:0 6px;font-size:10px;background:var(--ui-sidebar-surface-background);color:var(--ui-text-tertiary)">Gateway ready · MOCK</footer></div>\n<div id="palette"')
   .replace('<div data-slot="aui_assistant-message-content">', '<div data-slot="aui_intro"><p id="wordmark" class="wordmark" style="font-size:40px">HERMES AGENT</p></div><div data-slot="aui_assistant-message-content">')
   .replace('style[data-retroma-tactile]', 'style[data-nebula-skin]')
+  .replace('</style><script src="apply.js">', '.mock-cap{color:var(--theme-primary)}</style><script src="apply.js">')
+  .replace(/ data-mock-cap=""/g, ' data-mock-cap=""')
+  // Real captions: SidebarPanelLabel (tracking-[0.16em] + 8px .dither glyph) and
+  // a SidebarDateDivider (tracking-[0.12em]); nav icons are Codicon <i>s.
+  .replace('<div data-slot="sidebar-group-label">PINNED · MOCK</div>', '<div data-slot="sidebar-group-label"><span id="pinned-label" class="flex min-w-0 items-center gap-2 pl-2 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-(--theme-primary) mock-cap" style="display:flex;align-items:center;gap:8px;padding-left:8px;font-size:0.64rem;font-weight:600;text-transform:uppercase;letter-spacing:0.16em" data-mock-cap=""><span id="pinned-glyph" aria-hidden="true" class="dither inline-block size-2 shrink-0 rounded-[1px]" style="display:inline-block;width:8px;height:8px;flex-shrink:0"></span><span>PINNED · MOCK</span></span></div>')
+  .replace('<div data-slot="sidebar-group-label">SESSIONS · MOCK</div>', '<div data-slot="sidebar-group-label"><span class="flex min-w-0 items-center gap-2 pl-2 text-[0.64rem] font-semibold uppercase tracking-[0.16em] text-(--theme-primary) mock-cap" style="display:flex;align-items:center;gap:8px;padding-left:8px;font-size:0.64rem;font-weight:600;text-transform:uppercase;letter-spacing:0.16em" data-mock-cap=""><span aria-hidden="true" class="dither inline-block size-2 shrink-0 rounded-[1px]" style="display:inline-block;width:8px;height:8px;flex-shrink:0"></span><span>SESSIONS · MOCK</span></span><div class="flex items-center gap-2 px-2 pt-2"><span id="date-divider" class="shrink-0 text-[0.64rem] font-semibold uppercase tracking-[0.12em] text-(--ui-text-quaternary)">EARLIER · MOCK</span></div></div>')
+  .replace(/<span data-tour="sidebar-nav-([a-z-]+)">/g, '<i aria-hidden="true" class="codicon codicon-mock size-4 shrink-0"></i><span data-tour="sidebar-nav-$1">')
+  // A files-changed widget on the chat surface (WIDGET_SHELL_CLASS + slot).
+  .replace('<div data-slot="aui_intro">', '<div id="changed-files" data-slot="aui_changed-files" class="rounded-3xl bg-(--ui-widget-surface-background) px-3.5 py-3" style="background:var(--ui-widget-surface-background);border-radius:24px;padding:12px 14px">3 files changed · MOCK</div><div data-slot="aui_intro">')
   .replace("<script type=\"module\">", `<script>window.hermesDesktop={desktopPluginsRoot:async()=>'/plugins',readFileDataUrl:async p=>{const r=await fetch('/asset/'+p.split('/').pop());if(!r.ok)throw new Error('missing');const b=await r.blob();return new Promise(res=>{const f=new FileReader();f.onload=()=>res(f.result);f.readAsDataURL(b)})}}</script><script type="module">`)
-assert(fixture.includes('id="shell"') && fixture.includes('id="statusbar"') && fixture.includes('id="wordmark"'))
+assert(fixture.includes('id="shell"') && fixture.includes('id="statusbar"') && fixture.includes('id="wordmark"') && fixture.includes('id="pinned-glyph"') && fixture.includes('id="changed-files"') && fixture.includes('codicon-mock'))
+// Source contracts the sidebar rules lean on (fail loudly if Hermes renames them).
+const sidebarLabel = await read('app/shell/sidebar-label.tsx')
+assert(sidebarLabel.includes('tracking-[0.16em] text-(--theme-primary)') && sidebarLabel.includes("'dither inline-block size-2"), 'SidebarPanelLabel caption/glyph contract')
+const sidebarIndex = await read('app/chat/sidebar/index.tsx')
+assert(sidebarIndex.includes('data-tour={`sidebar-nav-${item.id}`}') && sidebarIndex.includes('<Codicon name={codicon}'), 'nav row label handle + codicon contract')
+assert((await read('components/chat/widget-shell.ts')).includes('bg-(--ui-widget-surface-background)'), 'widget shell token contract')
+assert((await read('components/assistant-ui/thread/changed-files-card.tsx')).includes('data-slot="aui_changed-files"'), 'changed-files slot contract')
 await writeFile(path.join(output, 'index.html'), fixture)
 const assetsDir = path.join(root, 'plugins/nebula-skin/assets')
 const server = createServer(async (req, res) => {
   try {
     if (req.url.startsWith('/asset/')) {
       const name = req.url.slice(7)
-      res.setHeader('Content-Type', name.endsWith('.webp') ? 'image/webp' : 'font/woff2')
+      res.setHeader('Content-Type', name.endsWith('.webp') ? 'image/webp' : name.endsWith('.png') ? 'image/png' : 'font/woff2')
       res.end(await readFile(path.join(assetsDir, name))); return
     }
     const name = req.url === '/' ? 'index.html' : req.url.slice(1)
@@ -140,6 +156,25 @@ try {
     assert(alpha(veil) > 0.3 && alpha(veil) < 0.9, 'content surface is translucent over the wallpaper: ' + veil)
     const bar = await page.locator('#statusbar').evaluate(e => getComputedStyle(e).backgroundColor)
     assert.equal(alpha(bar), 1, 'status bar stays opaque: ' + bar)
+    // Sidebar feedback round: captions lavender (not host cyan), sparkle glyph,
+    // per-row nav hues, rounded session rows, veiled files-changed widget.
+    const lav = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--nebula-lavender').trim())
+    const capColor = await page.locator('#pinned-label').evaluate(e => getComputedStyle(e).color)
+    assert.equal(capColor, await page.evaluate(l => { const d = document.createElement('div'); d.style.color = l; document.body.append(d); const c = getComputedStyle(d).color; d.remove(); return c }, lav), 'caption is lavender: ' + capColor)
+    const glyph = await page.locator('#pinned-glyph').evaluate(e => [getComputedStyle(e).backgroundImage, getComputedStyle(e, '::after').backgroundImage, e.getBoundingClientRect().width])
+    assert.equal(glyph[0], 'none', 'native dither removed'); assert.match(glyph[1], /^url\("data:image\/png;base64,/, 'sparkle painted'); assert.equal(glyph[2], 8, 'glyph box unchanged')
+    const inks = await page.evaluate(() => [...document.querySelectorAll('[data-tour="sessions-sidebar"] [data-sidebar="menu-button"]')].map(b => [getComputedStyle(b).borderTopColor, getComputedStyle(b.querySelector('.codicon')).color, getComputedStyle(b).borderRadius]))
+    assert(inks.length >= 5, 'fixture has nav rows'); assert.equal(new Set(inks.map(i => i[1])).size, inks.length, 'each nav row icon has its own hue: ' + inks.map(i => i[1]).join(' | '))
+    assert(inks.every(i => i[2] === '10px'), 'nav chips rounded 10px')
+    const rowRadius = await page.locator('#sessions-well [data-slot="row-button"]').first().evaluate(e => getComputedStyle(e).borderRadius)
+    assert.equal(rowRadius, '8px', 'session rows rounded')
+    const widget = await page.locator('#changed-files').evaluate(e => getComputedStyle(e).backgroundColor)
+    assert(alpha(widget) > 0.3 && alpha(widget) < 0.8, 'files-changed widget is veiled, not opaque: ' + widget)
+    // Nav row label text still clears AA on its chip fill in this mode.
+    const navPng = await page.locator('#nav-artifacts').screenshot()
+    const navBg = await page.evaluate(async b => { const img = new Image(); img.src = 'data:image/png;base64,' + b; await img.decode(); const c = document.createElement('canvas'); c.width = img.width; c.height = img.height; const x = c.getContext('2d'); x.drawImage(img, 0, 0); return [...x.getImageData(2, 2, 1, 1).data].slice(0, 3) }, navPng.toString('base64'))
+    const navFg = await page.locator('#nav-artifacts').evaluate(e => getComputedStyle(e).color.match(/\d+/g).slice(0, 3).map(Number))
+    assert(ratio(navBg, navFg) >= 4.5, `${mode} nav label ${ratio(navBg, navFg).toFixed(2)} fg=${navFg} bg=${navBg}`)
     const wm = await page.locator('#wordmark').evaluate(e => getComputedStyle(e).fontFamily)
     assert.match(wm, /Nebula Pixel/)
     assert(await page.evaluate(() => document.fonts.check("40px 'Nebula Pixel'")), 'pixel font loaded from woff2')

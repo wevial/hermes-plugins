@@ -70,6 +70,37 @@ export const colorCss = `
   --nebula-meta: #a6a1e6;
   --nebula-placeholder: #8c88c9;
 }
+/* Sidebar captions (PINNED / SESSIONS / date dividers) in lavender rather
+   than the cyan primary the host hard-codes for them. */
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] :is(span[class~="tracking-[0.16em]"], span[class~="tracking-[0.12em]"]) {
+  color: var(--nebula-lavender);
+}
+/* Navigation rows: one hue per row, cycling in the mockup's order (pink,
+   cyan, gold, green, blue, lavender, periwinkle). Position-based so plugin
+   rows (Theme Studio, Kanban, …) and user reordering are covered too. */
+:root[data-hermes-theme="nebula"] {
+  --nebula-ink-1: #b8236f; --nebula-ink-2: #0a6b86; --nebula-ink-3: #8a5f00; --nebula-ink-4: #1b7a49;
+  --nebula-ink-5: #2a5fc0; --nebula-ink-6: #5a3fc0; --nebula-ink-7: #3b52b5;
+}
+:root[data-hermes-theme="nebula"][data-hermes-mode="dark"] {
+  --nebula-ink-1: #ff7ac0; --nebula-ink-2: #5fe0ff; --nebula-ink-3: #f5d36a; --nebula-ink-4: #7af0b8;
+  --nebula-ink-5: #7fb2ff; --nebula-ink-6: #c9b4ff; --nebula-ink-7: #b8c6ff;
+}
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] li[data-sidebar="menu-item"]:nth-child(7n+1):has([data-tour^="sidebar-nav-"]) { --nebula-row-ink: var(--nebula-ink-1); }
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] li[data-sidebar="menu-item"]:nth-child(7n+2):has([data-tour^="sidebar-nav-"]) { --nebula-row-ink: var(--nebula-ink-2); }
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] li[data-sidebar="menu-item"]:nth-child(7n+3):has([data-tour^="sidebar-nav-"]) { --nebula-row-ink: var(--nebula-ink-3); }
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] li[data-sidebar="menu-item"]:nth-child(7n+4):has([data-tour^="sidebar-nav-"]) { --nebula-row-ink: var(--nebula-ink-4); }
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] li[data-sidebar="menu-item"]:nth-child(7n+5):has([data-tour^="sidebar-nav-"]) { --nebula-row-ink: var(--nebula-ink-5); }
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] li[data-sidebar="menu-item"]:nth-child(7n+6):has([data-tour^="sidebar-nav-"]) { --nebula-row-ink: var(--nebula-ink-6); }
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] li[data-sidebar="menu-item"]:nth-child(7n+7):has([data-tour^="sidebar-nav-"]) { --nebula-row-ink: var(--nebula-ink-7); }
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sidebar="menu-button"]:has([data-tour^="sidebar-nav-"]) {
+  color: color-mix(in srgb, var(--dt-foreground) 60%, var(--nebula-row-ink, var(--nebula-lavender)));
+  border-color: color-mix(in srgb, var(--nebula-row-ink, var(--nebula-lavender)) 70%, transparent);
+}
+/* Icons are Codicon <i> glyphs (or SVGs for plugin rows); paint them the row hue. */
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sidebar="menu-button"]:has([data-tour^="sidebar-nav-"]) > :is(svg, .codicon) {
+  color: var(--nebula-row-ink, var(--nebula-lavender));
+}
 :root[data-hermes-theme="nebula"] :is(input[data-slot="input"], textarea[data-slot="textarea"])::placeholder,
 :root[data-hermes-theme="nebula"] [data-slot="composer-rich-input"]:is(:empty, [data-empty])::before {
   color: var(--nebula-placeholder) !important;

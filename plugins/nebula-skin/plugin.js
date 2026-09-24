@@ -5,13 +5,14 @@ import { PALETTE_AREA, host } from '@hermes/plugin-sdk'
 
 const WALLPAPER_FILE = 'nebula-station.webp'
 const FONT_FILE = 'silkscreen.woff2'
+const SPARKLE_FILE = 'sparkle.png'
 
 // Everything is scoped to the Nebula theme so enabling the skin on another
 // palette changes nothing. Native sizes, padding, hit areas, drag regions and
 // body fonts are preserved; only paint changes. Overlays that must sit above
 // opaque pane children are pointer-transparent ::after rims (same approach as
 // Retroma Tactile) so geometry and scrolling are untouched.
-export const skinCss = ({ wallpaper, font }) => `
+export const skinCss = ({ wallpaper, font, sparkle }) => `
 ${font ? `@font-face { font-family: 'Nebula Pixel'; src: url(${font}) format('woff2'); font-display: swap; }` : ''}
 :root[data-hermes-theme="nebula"] {
   --nebula-rim: var(--dt-border);
@@ -89,26 +90,49 @@ ${wallpaper ? `
 :root[data-hermes-theme="nebula"] [data-slot="composer-surface"]:focus-within {
   box-shadow: 0 0 14px color-mix(in srgb, var(--nebula-cyan) 45%, transparent);
 }
-/* Navigation pills: outlined, rounded, cyan icons; the selected row brightens. */
-:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sidebar="menu-button"] {
-  border-color: color-mix(in srgb, var(--nebula-rim) 70%, transparent);
-  border-radius: 8px;
+/* Navigation chips: rounder, outlined in the row's own hue (set by the theme)
+   with a matching glow; the selected row brightens. */
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sidebar="menu-button"]:has([data-tour^="sidebar-nav-"]) {
+  border-radius: 10px;
   background-color: color-mix(in srgb, var(--theme-card-seed) 60%, transparent);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--nebula-row-ink, var(--nebula-lavender)) 30%, transparent);
 }
-:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sidebar="menu-button"] svg {
-  color: var(--nebula-cyan);
-}
-:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sidebar="menu-button"][class~="bg-(--ui-control-active-background)"] {
-  border-color: var(--nebula-cyan);
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sidebar="menu-button"]:has([data-tour^="sidebar-nav-"])[class~="bg-(--ui-control-active-background)"] {
+  border-color: var(--nebula-row-ink, var(--nebula-lavender));
   background-color: var(--theme-accent-soft);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--nebula-row-ink, var(--nebula-lavender)) 50%, transparent);
 }
-/* Section captions and the sessions list keep the lavender meta ink. */
-:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] span[class~="tracking-[0.12em]"] {
-  color: var(--nebula-lavender);
+/* Session rows: rounded like Retroma; hover and the active row get a rim. */
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-slot="row-button"] {
+  border-radius: 8px;
+}
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-slot="row-button"]:hover {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 40%, transparent);
 }
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-slot="row-button"][class~="bg-(--ui-row-active-background)"] {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 60%, transparent), var(--nebula-glow);
+}
+/* Section caption glyph: the native 8px dithered square becomes the sparkle,
+   painted by an overlay so the caption's geometry is unchanged. */
+${sparkle ? `
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] span[class~="tracking-[0.16em]"] > span.dither {
+  position: relative;
+  background: none;
+}
+:root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] span[class~="tracking-[0.16em]"] > span.dither::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  pointer-events: none;
+  background: url(${sparkle}) center / contain no-repeat;
+}` : ''}
+/* Inline widgets (files-changed card, clarify) sit on a veil over the scene
+   with a rim, instead of the opaque widget surface. */
+:root[data-hermes-theme="nebula"] [data-contrib-shell] {
+  --ui-widget-surface-background: color-mix(in srgb, var(--theme-card-seed) 55%, transparent);
+}
+:root[data-hermes-theme="nebula"] [data-slot="aui_changed-files"] {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--nebula-rim) 60%, transparent);
-  border-radius: 8px;
 }
 /* User bubble: lavender-tinted, outlined, like the mockup. Assistant text
    stays unboxed on the scene; code cards get a translucent dark card. */
@@ -153,8 +177,8 @@ export default {
     const removeStyle = () => { style?.remove(); style = null }
     const loadAssets = async () => {
       if (assets) return assets
-      const [wallpaper, font] = await Promise.all([loadAsset(WALLPAPER_FILE), loadAsset(FONT_FILE)].map(p => p.catch(() => null)))
-      assets = { wallpaper, font }
+      const [wallpaper, font, sparkle] = await Promise.all([loadAsset(WALLPAPER_FILE), loadAsset(FONT_FILE), loadAsset(SPARKLE_FILE)].map(p => p.catch(() => null)))
+      assets = { wallpaper, font, sparkle }
       if (!wallpaper && !disposed) host.notify({ kind: 'error', message: 'Nebula wallpaper could not be read; the skin is on without it. Is assets/nebula-station.webp installed?' })
       return assets
     }

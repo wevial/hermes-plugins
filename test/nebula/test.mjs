@@ -111,6 +111,7 @@ assert((await read('components/assistant-ui/thread/changed-files-card.tsx')).inc
 fixture = fixture.replace('id="titlebar-strip" class="titlebar-strip"', 'id="titlebar-strip" data-zone-tabstrip="mock-main" class="titlebar-strip"')
   .replace('</style>', '[data-zone-tabstrip]{background:var(--ui-sidebar-surface-background);--pane-tab-active-bg:var(--ui-sidebar-surface-background)}</style>')
 fixture = fixture.replace('<div data-slot="sidebar-group-label">', '<div data-sessions-project="mock"><button data-slot="row-button" class="p-0"><span id="project-label">Example project</span></button></div><div data-slot="sidebar-group-label">')
+fixture = fixture.replace('<div class="pane-layer"><div class="body">', '<div class="pane-layer"><div id="chat-surface" data-chat-surface=""><div id="composer-bounds" data-slot="composer-bounds"><div class="body">').replace('</article></div>', '</article></div></div></div>').replace('</style>', '[data-chat-surface],[data-slot="composer-bounds"]{background:var(--ui-chat-surface-background)}</style>')
 fixture = fixture.replace('skinPlugin.register(context(sd));', 'const sc=context(sd);skinPlugin.register(sc);window.reloadSkin=()=>{sd.splice(0).forEach(f=>f());skinPlugin.register(sc)};')
 fixture = fixture.replace("get(k){window.storageLog.push('get:'+k);", "get(k){if(k==='background' && window.failBackgroundRead)throw new Error('background read failed');window.storageLog.push('get:'+k);")
 assert(fixture.includes('window.reloadSkin='), 'reload fixture preserves the plugin storage namespace')
@@ -256,6 +257,11 @@ try {
     for (const [slot, bg] of codeBackdrops) assert.equal(alpha(bg), 1, `${slot} must block the wallpaper: ${bg}`);
     const veil = await page.locator('#panel').evaluate(e => getComputedStyle(e.querySelector('.pane-layer')).backgroundColor)
     assert(alpha(veil) > 0.3 && alpha(veil) <= 0.65, 'content surface is translucent over the wallpaper: ' + veil)
+    for (const id of ['chat-surface', 'composer-bounds']) {
+      const bg = await page.locator('#' + id).evaluate(e => getComputedStyle(e).backgroundColor)
+      if (mode === 'light') assert.equal(alpha(bg), 0, `${id} must not stack a second veil: ${bg}`)
+      else assert(alpha(bg) > 0, `dark ${id} keeps its existing veil`)
+    }
     const bar = await page.locator('#statusbar').evaluate(e => getComputedStyle(e).backgroundColor)
     assert.equal(alpha(bar), 1, 'status bar stays opaque: ' + bar)
     // Sidebar feedback round: captions lavender (not host cyan), sparkle glyph,

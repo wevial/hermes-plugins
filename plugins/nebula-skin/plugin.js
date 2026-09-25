@@ -91,6 +91,11 @@ ${wallpaper ? `
 :root[data-hermes-theme="nebula"] [data-contrib-shell] [data-tree-group][data-window-top="true"] > .relative.min-h-0.min-w-0.flex-1.overflow-hidden {
   background-color: var(--ui-editor-surface-background);
 }
+/* Light mode: the pane body already paints one veil; the chat root and its
+   composer bounds would each stack another (3 x 64% reads ~95% solid). */
+:root[data-hermes-theme="nebula"][data-hermes-mode="light"] [data-contrib-shell] [data-tree-group] :is([data-chat-surface], [data-slot="composer-bounds"]) {
+  background-color: transparent;
+}
 /* Lavender rims with a soft glow: sidebar, pane bodies, composer. Painted by
    pointer-transparent overlays so opaque kept-alive panes cannot cover them. */
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"]::after,

@@ -255,7 +255,7 @@ try {
     });
     for (const [slot, bg] of codeBackdrops) assert.equal(alpha(bg), 1, `${slot} must block the wallpaper: ${bg}`);
     const veil = await page.locator('#panel').evaluate(e => getComputedStyle(e.querySelector('.pane-layer')).backgroundColor)
-    assert(alpha(veil) > 0.3 && alpha(veil) < 0.9, 'content surface is translucent over the wallpaper: ' + veil)
+    assert(alpha(veil) > 0.3 && alpha(veil) <= 0.65, 'content surface is translucent over the wallpaper: ' + veil)
     const bar = await page.locator('#statusbar').evaluate(e => getComputedStyle(e).backgroundColor)
     assert.equal(alpha(bar), 1, 'status bar stays opaque: ' + bar)
     // Sidebar feedback round: captions lavender (not host cyan), sparkle glyph,

@@ -21,7 +21,7 @@ export const skinCss = ({ wallpaper, sparkle }) => `
   --nebula-sidebar-keep: 96%;
 }
 :root[data-hermes-theme="nebula"][data-hermes-mode="light"] {
-  --nebula-veil: 0.78;
+  --nebula-veil: 0.64;
   --nebula-glow: 0 0 12px color-mix(in srgb, var(--nebula-lavender) 45%, transparent);
 }
 /* Wallpaper: painted once on the window shell, behind everything. Glass mode

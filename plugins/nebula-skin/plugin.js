@@ -119,6 +119,23 @@ ${wallpaper ? `
   border-radius: 12px;
   box-shadow: 0 0 0 12px var(--theme-background-seed), var(--nebula-frame), inset var(--nebula-glow);
 }
+/* Stable pane guests now live beside the layout tree, not inside PaneBody.
+   Paint their content surface directly; toolbar/search need the backing too. */
+:root[data-hermes-theme="nebula"] [data-contrib-shell] [data-pane-host]:has([data-slot="bots-roster"]) > div {
+  background-color: color-mix(in srgb, var(--theme-sidebar-seed) var(--nebula-sidebar-keep), transparent);
+}
+:root[data-hermes-theme="nebula"] [data-contrib-shell] [data-pane-host] {
+  border-radius: 12px;
+}
+:root[data-hermes-theme="nebula"] [data-contrib-shell] [data-pane-host]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  border-radius: 12px;
+  box-shadow: 0 0 0 12px var(--theme-background-seed), var(--nebula-frame), inset var(--nebula-glow);
+}
 /* The sessions list is its own scrolling well: give it a rounded rim too. */
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sessions-mode] {
   border-radius: 12px;

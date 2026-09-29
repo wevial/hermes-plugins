@@ -300,6 +300,26 @@ try {
     assert.equal(await page.locator('#pane-body').evaluate(e => getComputedStyle(e, '::after').content), 'none')
     assert.match(await page.evaluate(() => notifications.at(-1).message), /is OFF/)
   })
+  await check('stable sibling pane hosts retain bot backing and rounded glow', async () => {
+    const alpha = c => { const m = c.match(/\/\s*([\d.]+)\)$/) || c.match(/^rgba\(.*,\s*([\d.]+)\)$/); return m ? Number(m[1]) : 1 }
+    await page.evaluate(() => {
+      const shell = document.querySelector('#shell')
+      shell.insertAdjacentHTML('beforeend', `<div id="modern-chat" data-pane-host="workspace" data-tree-group="modern-main" style="position:absolute;left:330px;top:55px;width:600px;height:400px;overflow:auto"><div data-chat-surface style="height:100%"></div></div><div id="modern-bots" data-pane-host="hermes-bots:pane" data-tree-group="modern-bots" style="position:absolute;left:0;top:55px;width:300px;height:400px;overflow:auto"><div id="modern-bot-body" style="height:100%"><div data-slot="bots-roster">Mock bot roster</div></div></div>`)
+    })
+    for (const mode of ['light', 'dark']) {
+      await page.evaluate(m => { selectMode(m); run('enable') }, mode); await waitSkin(true); await settle()
+      for (const id of ['modern-chat', 'modern-bots']) {
+        const rim = await page.locator('#' + id).evaluate(e => { const s = getComputedStyle(e, '::after'); return [s.content, s.borderRadius, s.boxShadow, s.pointerEvents] })
+        assert.notEqual(rim[0], 'none', `${id} has visible-host framing`)
+        assert.equal(rim[1], '12px'); assert.notEqual(rim[2], 'none'); assert.equal(rim[3], 'none')
+      }
+      assert(alpha(await page.locator('#modern-bot-body').evaluate(e => getComputedStyle(e).backgroundColor)) >= .95, 'bot root retains near-opaque sidebar backing outside the old zone')
+      if (mode === 'dark') await page.screenshot({ path: path.join(output, 'mock-stable-hosts.png') })
+    }
+    await page.evaluate(() => { run('disable') }); await waitSkin(false); await settle()
+    assert.equal(await page.locator('#modern-chat').evaluate(e => getComputedStyle(e, '::after').content), 'none')
+    await page.evaluate(() => { document.querySelector('#modern-chat').remove(); document.querySelector('#modern-bots').remove() })
+  })
   await check('skin is scoped to the Nebula theme; toggle and dispose clean up', async () => {
     await page.evaluate(() => run('enable')); await waitSkin(true)
     await page.evaluate(() => { document.documentElement.dataset.hermesTheme = 'other' }); await settle()

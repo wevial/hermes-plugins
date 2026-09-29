@@ -57,6 +57,11 @@ ${wallpaper ? `
   font-family: var(--dt-font-mono);
   letter-spacing: 0.02em;
 }
+/* Rounded horizontal tab chips; native fills, underline, close affordances,
+   drag geometry and collapsed vertical rails remain untouched. */
+:root[data-hermes-theme="nebula"] :is([data-tree-tab], [data-slot="pane-tab"]):not([data-vertical="true"]) {
+  border-radius: 10px 10px 4px 4px;
+}
 /* Stronger tab and sidebar hierarchy without changing session text. */
 :root[data-hermes-theme="nebula"] [data-tree-tab],
 :root[data-hermes-theme="nebula"] [data-tree-tab] .font-medium {

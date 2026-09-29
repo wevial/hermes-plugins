@@ -300,6 +300,22 @@ try {
     assert.equal(await page.locator('#pane-body').evaluate(e => getComputedStyle(e, '::after').content), 'none')
     assert.match(await page.evaluate(() => notifications.at(-1).message), /is OFF/)
   })
+  await check('horizontal tabs are rounded without changing native selection or vertical rails', async () => {
+    await page.evaluate(() => {
+      const strip = document.createElement('div'); strip.id = 'rounded-tabs';
+      strip.innerHTML = '<div id="rounded-active" data-slot="pane-tab" data-tree-tab data-active="true" style="box-shadow:inset 0 -2px 0 rgb(141,99,255)">Active</div><div id="rounded-idle" data-slot="pane-tab" data-tree-tab data-active="false">Idle</div><div id="rounded-vertical" data-slot="pane-tab" data-tree-tab data-vertical="true">Rail</div>';
+      document.querySelector('#shell').append(strip)
+    })
+    for (const mode of ['light', 'dark']) {
+      await page.evaluate(m => { selectMode(m); run('enable') }, mode); await waitSkin(true); await settle()
+      for (const id of ['rounded-active', 'rounded-idle']) assert.equal(await page.locator('#' + id).evaluate(e => getComputedStyle(e).borderRadius), '10px 10px 4px 4px')
+      assert.equal(await page.locator('#rounded-vertical').evaluate(e => getComputedStyle(e).borderRadius), '0px', 'collapsed rails stay native')
+      assert.match(await page.locator('#rounded-active').evaluate(e => getComputedStyle(e).boxShadow), /inset/, 'native active underline preserved')
+    }
+    await page.evaluate(() => run('disable')); await waitSkin(false); await settle()
+    assert.equal(await page.locator('#rounded-active').evaluate(e => getComputedStyle(e).borderRadius), '0px', 'disable restores native tab shape')
+    await page.evaluate(() => document.querySelector('#rounded-tabs').remove())
+  })
   await check('live zone-body wrappers retain content framing and bot backing', async () => {
     const alpha = c => { const m = c.match(/\/\s*([\d.]+)\)$/) || c.match(/^rgba\(.*,\s*([\d.]+)\)$/); return m ? Number(m[1]) : 1 }
     await page.evaluate(() => {

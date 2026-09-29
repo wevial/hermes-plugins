@@ -176,6 +176,11 @@ ${wallpaper ? `
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-slot="row-button"] {
   border-radius: 8px;
 }
+/* Lift session-title ink a little without brightening tertiary metadata,
+   timestamps, project labels or the rest of the application palette. */
+:root[data-hermes-theme="nebula"][data-hermes-mode="dark"] [data-tour="sessions-sidebar"] [data-slot="row-button"] {
+  --ui-text-secondary: #d8d5ea;
+}
 /* Section caption glyph: the native 8px dithered square becomes the sparkle,
    painted by an overlay so the caption's geometry is unchanged. */
 ${sparkle ? `

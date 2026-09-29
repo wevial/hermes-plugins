@@ -300,6 +300,20 @@ try {
     assert.equal(await page.locator('#pane-body').evaluate(e => getComputedStyle(e, '::after').content), 'none')
     assert.match(await page.evaluate(() => notifications.at(-1).message), /is OFF/)
   })
+  await check('dark session titles are brighter while secondary metadata stays muted', async () => {
+    await page.evaluate(() => document.querySelector('[data-tour="sessions-sidebar"]').insertAdjacentHTML('beforeend', '<div id="title-color-row" data-slot="row-button"><span id="session-title-probe" style="color:var(--ui-text-secondary)">Session title</span><span id="session-meta-probe" style="color:var(--ui-text-tertiary)">Model · messages</span></div>'))
+    for (const mode of ['light', 'dark']) {
+      await page.evaluate(m => selectMode(m), mode); await settle()
+      const beforeTitle = await page.locator('#session-title-probe').evaluate(e => getComputedStyle(e).color)
+      const beforeMeta = await page.locator('#session-meta-probe').evaluate(e => getComputedStyle(e).color)
+      await page.evaluate(() => run('enable')); await waitSkin(true); await settle()
+      assert.equal(await page.locator('#session-title-probe').evaluate(e => getComputedStyle(e).color), mode === 'dark' ? 'rgb(216, 213, 234)' : beforeTitle)
+      assert.equal(await page.locator('#session-meta-probe').evaluate(e => getComputedStyle(e).color), beforeMeta, 'metadata remains unchanged')
+      await page.evaluate(() => run('disable')); await waitSkin(false); await settle()
+      assert.equal(await page.locator('#session-title-probe').evaluate(e => getComputedStyle(e).color), beforeTitle, 'disable restores native title ink')
+    }
+    await page.evaluate(() => document.querySelector('#title-color-row').remove())
+  })
   await check('horizontal tabs are rounded without changing native selection or vertical rails', async () => {
     await page.evaluate(() => {
       const strip = document.createElement('div'); strip.id = 'rounded-tabs';

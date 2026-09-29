@@ -88,7 +88,8 @@ ${wallpaper ? `
   background-color: transparent;
 }
 /* Move the removed backing layer below the header, preserving content contrast. */
-:root[data-hermes-theme="nebula"] [data-contrib-shell] [data-tree-group][data-window-top="true"] > .relative.min-h-0.min-w-0.flex-1.overflow-hidden {
+:root[data-hermes-theme="nebula"] [data-contrib-shell] [data-tree-group][data-window-top="true"] > .relative.min-h-0.min-w-0.flex-1.overflow-hidden,
+:root[data-hermes-theme="nebula"] [data-contrib-shell] [data-tree-group][data-window-top="true"] > [data-zone-body] > .relative.min-h-0.min-w-0.flex-1.overflow-hidden {
   background-color: var(--ui-editor-surface-background);
 }
 /* Light mode: the pane body already paints one veil; the chat root and its
@@ -100,6 +101,7 @@ ${wallpaper ? `
    pointer-transparent overlays so opaque kept-alive panes cannot cover them. */
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"]::after,
 :root[data-hermes-theme="nebula"] [data-tree-group] > div.relative.flex-1.overflow-hidden::after,
+:root[data-hermes-theme="nebula"] [data-tree-group] > [data-zone-body] > div.relative.flex-1.overflow-hidden::after,
 :root[data-hermes-theme="nebula"] [data-slot="composer-surface"]::after {
   content: "";
   position: absolute;
@@ -115,7 +117,8 @@ ${wallpaper ? `
 /* Rounded content bodies like Retroma. The overlay's outer ring is trimmed
    by PaneBody's overflow-hidden, leaving indigo corner wedges above any
    kept-alive pane host; the box, hit-testing and scrolling are unchanged. */
-:root[data-hermes-theme="nebula"] [data-tree-group] > div.relative.flex-1.overflow-hidden::after {
+:root[data-hermes-theme="nebula"] [data-tree-group] > div.relative.flex-1.overflow-hidden::after,
+:root[data-hermes-theme="nebula"] [data-tree-group] > [data-zone-body] > div.relative.flex-1.overflow-hidden::after {
   border-radius: 12px;
   box-shadow: 0 0 0 12px var(--theme-background-seed), var(--nebula-frame), inset var(--nebula-glow);
 }

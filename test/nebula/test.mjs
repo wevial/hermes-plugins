@@ -300,6 +300,25 @@ try {
     assert.equal(await page.locator('#pane-body').evaluate(e => getComputedStyle(e, '::after').content), 'none')
     assert.match(await page.evaluate(() => notifications.at(-1).message), /is OFF/)
   })
+  await check('live zone-body wrappers retain content framing and bot backing', async () => {
+    const alpha = c => { const m = c.match(/\/\s*([\d.]+)\)$/) || c.match(/^rgba\(.*,\s*([\d.]+)\)$/); return m ? Number(m[1]) : 1 }
+    await page.evaluate(() => {
+      for (const kind of ['chat', 'bots']) document.querySelector('#shell').insertAdjacentHTML('beforeend', `<div id="wrapped-${kind}" data-tree-group="wrapped-${kind}" data-window-top="true" class="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden" style="position:absolute;left:${kind === 'chat' ? 330 : 0}px;top:55px;width:300px;height:400px"><header data-panel-header style="height:35px">Header</header><div data-zone-body="wrapped-${kind}" data-slot="context-menu-trigger"><div id="wrapped-${kind}-body" class="relative min-h-0 min-w-0 flex-1 overflow-hidden" style="height:365px"><div class="absolute inset-0 overflow-auto"><div ${kind === 'chat' ? 'data-chat-surface' : 'data-slot="bots-roster"'}>Mock content</div></div></div></div></div>`)
+    })
+    for (const mode of ['light', 'dark']) {
+      await page.evaluate(m => { selectMode(m); run('enable') }, mode); await waitSkin(true); await settle()
+      for (const kind of ['chat', 'bots']) {
+        const rim = await page.locator(`#wrapped-${kind}-body`).evaluate(e => { const s = getComputedStyle(e, '::after'); return [s.content, s.borderRadius, s.boxShadow, s.pointerEvents] })
+        assert.notEqual(rim[0], 'none', `${kind}: wrapped body must paint a frame`)
+        assert.equal(rim[1], '12px'); assert.notEqual(rim[2], 'none'); assert.equal(rim[3], 'none')
+        assert.equal(await page.locator(`#wrapped-${kind} header`).evaluate(e => getComputedStyle(e, '::after').content), 'none', 'no frame across header')
+      }
+      assert(alpha(await page.locator('#wrapped-bots-body').evaluate(e => getComputedStyle(e).backgroundColor)) >= .95, 'wrapped Bots body restores near-opaque backing')
+    }
+    await page.evaluate(() => run('disable')); await waitSkin(false); await settle()
+    assert.equal(await page.locator('#wrapped-chat-body').evaluate(e => getComputedStyle(e, '::after').content), 'none')
+    await page.evaluate(() => { for (const kind of ['chat', 'bots']) document.querySelector(`#wrapped-${kind}`).remove() })
+  })
   await check('stable sibling pane hosts retain bot backing and rounded glow', async () => {
     const alpha = c => { const m = c.match(/\/\s*([\d.]+)\)$/) || c.match(/^rgba\(.*,\s*([\d.]+)\)$/); return m ? Number(m[1]) : 1 }
     await page.evaluate(() => {

@@ -311,6 +311,9 @@ try {
         const rim = await page.locator(`#wrapped-${kind}-body`).evaluate(e => { const s = getComputedStyle(e, '::after'); return [s.content, s.borderRadius, s.boxShadow, s.pointerEvents] })
         assert.notEqual(rim[0], 'none', `${kind}: wrapped body must paint a frame`)
         assert.equal(rim[1], '12px'); assert.notEqual(rim[2], 'none'); assert.equal(rim[3], 'none')
+        assert.equal(await page.locator(`#wrapped-${kind}-body`).evaluate(e => getComputedStyle(e).borderRadius), '12px', 'content clips to the rounded frame instead of painting square corners')
+        const expectedGlow = await page.locator(`#wrapped-${kind}-body`).evaluate(e => { const p = document.createElement('div'); p.style.boxShadow = 'var(--nebula-frame), inset var(--nebula-glow)'; e.append(p); const shadow = getComputedStyle(p).boxShadow; p.remove(); return shadow })
+        assert.equal(rim[2], expectedGlow, 'frame has no opaque outer masking ring')
         assert.equal(await page.locator(`#wrapped-${kind} header`).evaluate(e => getComputedStyle(e, '::after').content), 'none', 'no frame across header')
       }
       assert(alpha(await page.locator('#wrapped-bots-body').evaluate(e => getComputedStyle(e).backgroundColor)) >= .95, 'wrapped Bots body restores near-opaque backing')

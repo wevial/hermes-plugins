@@ -114,13 +114,16 @@ ${wallpaper ? `
 :root[data-hermes-theme="nebula"] [data-slot="composer-surface"]::after {
   border-radius: inherit;
 }
-/* Rounded content bodies like Retroma. The overlay's outer ring is trimmed
-   by PaneBody's overflow-hidden, leaving indigo corner wedges above any
-   kept-alive pane host; the box, hit-testing and scrolling are unchanged. */
+/* Clip the content itself to the rim. An opaque spread mask on the overlay
+   hides wallpaper at the corners; real rounded clipping keeps it visible. */
+:root[data-hermes-theme="nebula"] [data-tree-group] > div.relative.flex-1.overflow-hidden,
+:root[data-hermes-theme="nebula"] [data-tree-group] > [data-zone-body] > div.relative.flex-1.overflow-hidden {
+  border-radius: 12px;
+}
 :root[data-hermes-theme="nebula"] [data-tree-group] > div.relative.flex-1.overflow-hidden::after,
 :root[data-hermes-theme="nebula"] [data-tree-group] > [data-zone-body] > div.relative.flex-1.overflow-hidden::after {
   border-radius: 12px;
-  box-shadow: 0 0 0 12px var(--theme-background-seed), var(--nebula-frame), inset var(--nebula-glow);
+  box-shadow: var(--nebula-frame), inset var(--nebula-glow);
 }
 /* Stable pane guests now live beside the layout tree, not inside PaneBody.
    Paint their content surface directly; toolbar/search need the backing too. */
@@ -137,7 +140,7 @@ ${wallpaper ? `
   z-index: 7;
   pointer-events: none;
   border-radius: 12px;
-  box-shadow: 0 0 0 12px var(--theme-background-seed), var(--nebula-frame), inset var(--nebula-glow);
+  box-shadow: var(--nebula-frame), inset var(--nebula-glow);
 }
 /* The sessions list is its own scrolling well: give it a rounded rim too. */
 :root[data-hermes-theme="nebula"] [data-tour="sessions-sidebar"] [data-sessions-mode] {
